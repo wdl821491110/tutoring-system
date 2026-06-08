@@ -25,7 +25,7 @@ const request = (url, options = {}) => {
   const token = getToken();
   const headers = {
     'Content-Type': 'application/json',
-    ...(token ? { Authorization: `Bearer ${token}` } : {}),
+    ...(token ? { 'X-Auth-Token': `Bearer ${token}` } : {}),
     ...(options.header || {})
   };
 

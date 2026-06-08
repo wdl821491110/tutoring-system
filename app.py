@@ -153,11 +153,18 @@ def _ensure_warm():
         return False
 
 def _proxy_to_cloudbase():
-    """将请求转发到 Render 后端，快速尝试+预热重试"""
+    """将请求转发到 Render 后端，快速尝试+预热重试
+    并将 Authorization 改名为 X-Auth-Token，绕过 Cloudflare WAF 对中文 body 的拦截
+    """
     target_url = CLOUDBASE_API + request.full_path.split('?')[0] if request.full_path.startswith('/api') else CLOUDBASE_API + request.path
     fwd_headers = {}
     for k, v in request.headers:
         if k.lower() in ('host', 'content-length'):
+            continue
+        # 绕过 Cloudflare WAF：Authorization 含 JWT + 中文 body 会被拦截
+        # 改用自定义 X-Auth-Token header
+        if k.lower() == 'authorization':
+            fwd_headers['X-Auth-Token'] = v
             continue
         fwd_headers[k] = v
     body = request.get_data()
@@ -315,9 +322,10 @@ def generate_token(user_id, role, username='', linked_student_id=None, linked_te
 
 def get_current_user():
 
-    """从请求头获取当前用户信息（JWT 验证，本地和 Render 互认）"""
-
-    token = request.headers.get('Authorization', '')
+    """从请求头获取当前用户信息（JWT 验证，本地和 Render 互认）
+    同时支持 Authorization 和 X-Auth-Token（绕过 Cloudflare WAF 对含中文 body 的拦截）
+    """
+    token = request.headers.get('Authorization', '') or request.headers.get('X-Auth-Token', '')
 
     if token.startswith('Bearer '):
 

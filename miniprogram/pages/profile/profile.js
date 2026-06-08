@@ -28,7 +28,7 @@ Page({
     wx.showLoading({ title: '下载中' });
     wx.downloadFile({
       url: `${BASE_URL}/api/backup/download`,
-      header: { Authorization: `Bearer ${app.globalData.token}` },
+      header: { 'X-Auth-Token': `Bearer ${app.globalData.token}` },
       success: (res) => {
         wx.hideLoading();
         if (res.statusCode === 200) {
