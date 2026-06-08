@@ -125,8 +125,11 @@ def handle_local_proxy_or_cors():
 
         return resp
 
-    # 本地 exe 模式：USE_PROXY=True 时 /api/* 转发到 CloudBase
-    if USE_PROXY and not IS_CLOUD and request.path.startswith('/api/'):
+    # 本地 exe 模式：业务 API 走 Render（数据互通）
+    # 登录/鉴权排除在外：走本地，避免 Render 冷启动阻塞登录
+    # JWT 密钥一致，本地签发的 token 能被 Render 验证
+    _LOCAL_AUTH_PATHS = ('/api/auth/login', '/api/auth/me', '/api/auth/logout')
+    if USE_PROXY and not IS_CLOUD and request.path.startswith('/api/') and request.path not in _LOCAL_AUTH_PATHS:
 
         return _proxy_to_cloudbase()
 
