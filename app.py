@@ -174,12 +174,12 @@ def _proxy_to_cloudbase():
 
     
 
-    # 构建响应
-
+    # 构建响应 — Render冷启动返回非JSON时拦截
+    ct = resp.headers.get('Content-Type', '')
+    if resp.status_code >= 500 or (resp.status_code >= 400 and 'json' not in ct):
+        return api_error(f'后端服务繁忙(HTTP {resp.status_code})，请稍后重试', 502, 502)
     excluded_headers = {'content-encoding', 'content-length', 'transfer-encoding', 'connection'}
-
     resp_headers = [(k, v) for k, v in resp.raw.headers.items() if k.lower() not in excluded_headers]
-
     return Response(resp.content, status=resp.status_code, headers=resp_headers)
 
 @app.after_request
