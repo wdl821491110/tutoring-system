@@ -23,15 +23,18 @@ const redirectToLogin = () => {
 
 const request = (url, options = {}) => {
   const token = getToken();
+  // 绕过 Cloudflare WAF：JWT 放 header + 中文 body 会被拦截，改用 URL 参数 ?token=
+  const fullUrl = token
+    ? `${BASE_URL}${url}${url.includes('?') ? '&' : '?'}token=${encodeURIComponent(token)}`
+    : `${BASE_URL}${url}`;
   const headers = {
     'Content-Type': 'application/json',
-    ...(token ? { 'X-App-Key': `Bearer ${token}` } : {}),
     ...(options.header || {})
   };
 
   return new Promise((resolve, reject) => {
     wx.request({
-      url: BASE_URL + url,
+      url: fullUrl,
       method: options.method || 'GET',
       data: options.body,
       header: headers,

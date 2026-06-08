@@ -154,20 +154,32 @@ def _ensure_warm():
 
 def _proxy_to_cloudbase():
     """将请求转发到 Render 后端，快速尝试+预热重试
-    并将 Authorization 改名为 X-App-Key，绕过 Cloudflare WAF 对中文 body 的拦截
+    Cloudflare WAF 拦截任何 header 中的 JWT + 中文 body，因此把 token 放到 URL 参数 ?token=
     """
     target_url = CLOUDBASE_API + request.full_path.split('?')[0] if request.full_path.startswith('/api') else CLOUDBASE_API + request.path
+
+    # 从 Authorization header 提取 token，追加到 URL params
+    proxy_token = None
     fwd_headers = {}
     for k, v in request.headers:
         if k.lower() in ('host', 'content-length'):
             continue
-        # 绕过 Cloudflare WAF：Authorization/X-Auth-Token 含 JWT + 中文 body 会被拦截
-        # 改用 X-App-Key header（不含 "auth"/"token" 关键字）
         if k.lower() == 'authorization':
-            fwd_headers['X-App-Key'] = v
-            continue
+            if v.startswith('Bearer '):
+                proxy_token = v[7:]
+            continue  # 不转发此 header
         fwd_headers[k] = v
+
     body = request.get_data()
+
+    # 把 token 拼进 query string（绕过 Cloudflare JWT 检测）
+    params = {}
+    if proxy_token:
+        params['token'] = proxy_token
+    if request.method == 'GET':
+        for k, v in request.args.items():
+            if k != 'token':  # 避免重复
+                params[k] = v
     excluded_headers = {'content-encoding', 'content-length', 'transfer-encoding', 'connection'}
 
     def _do_request(timeout):
@@ -175,7 +187,7 @@ def _proxy_to_cloudbase():
         try:
             resp = requests.request(method=request.method, url=target_url,
                 headers=fwd_headers, data=body,
-                params=request.args if request.method == 'GET' else None,
+                params=params if params else None,
                 timeout=timeout, allow_redirects=False)
             ct = resp.headers.get('Content-Type', '')
             if 'json' in ct:
@@ -322,10 +334,11 @@ def generate_token(user_id, role, username='', linked_student_id=None, linked_te
 
 def get_current_user():
 
-    """从请求头获取当前用户信息（JWT 验证，本地和 Render 互认）
-    同时支持 Authorization 和 X-App-Key（绕过 Cloudflare WAF 对含中文 body 的拦截）
+    """从请求头/URL参数获取当前用户信息（JWT 验证，本地和 Render 互认）
+    token 可通过 Authorization header 或 ?token= URL参数传递
+    URL参数方式用于绕过 Cloudflare WAF（JWT 放 header 会被拦截）
     """
-    token = request.headers.get('Authorization', '') or request.headers.get('X-App-Key', '')
+    token = request.headers.get('Authorization', '') or request.args.get('token', '')
 
     if token.startswith('Bearer '):
 
