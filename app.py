@@ -162,23 +162,28 @@ def _proxy_to_cloudbase():
 
     # 从 Authorization header 提取 token，追加到 URL params
     proxy_token = None
-    fwd_headers = {}
     for k, v in request.headers:
-        if k.lower() in ('host', 'content-length'):
-            continue
-        if k.lower() == 'authorization':
-            if v.startswith('Bearer '):
-                proxy_token = v[7:]
-            continue  # 不转发此 header
-        fwd_headers[k] = v
+        if k.lower() == 'authorization' and v.startswith('Bearer '):
+            proxy_token = v[7:]
+            break
+    fwd_headers = {'Content-Type': 'application/json'}  # 最小 header 集，避免 Cloudflare 误拦截
 
     body = request.get_data()
+    # 确保 body 是 UTF-8（curl/浏览器可能用 GBK 发送中文）
+    if body:
+        try:
+            body = body.decode('utf-8').encode('utf-8')
+        except UnicodeDecodeError:
+            try:
+                body = body.decode('gbk').encode('utf-8')
+            except Exception:
+                pass
 
     # Cloudflare WAF 拦截所有含 JWT + 中文 body 的请求
     # 方案：token 放 ?t= 参数，body 做 base64 编码
     params = {'t': proxy_token, 'b64': '1'} if proxy_token else {}
     body_b64 = base64.b64encode(body).decode() if body and proxy_token else None
-    body_to_send = body_b64.encode() if body_b64 else body
+    body_to_send = body_b64  # str, 不要 encode 成 bytes
     if request.method == 'GET':
         for k, v in request.args.items():
             if k not in ('t', 'b64', 'token'):
