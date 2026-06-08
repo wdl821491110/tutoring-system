@@ -288,17 +288,16 @@ def verify_password(stored_hash, password):
 
     return check_password_hash(stored_hash, password)
 
-def generate_token(user_id, role, real_name='', username='', linked_student_id=None, linked_teacher_id=None):
+def generate_token(user_id, role, username='', linked_student_id=None, linked_teacher_id=None):
 
-    """生成 JWT token（本地和 Render 共享密钥，互相认可）"""
-
+    """生成 JWT token（本地和 Render 共享密钥，互相认可）
+    注意：real_name 从 JWT 中移除，避免 Cloudflare WAF 因中文+JWT组合误拦截写请求
+    """
     payload = {
 
         'user_id': user_id,
 
         'role': role,
-
-        'real_name': real_name,
 
         'username': username,
 
@@ -332,13 +331,21 @@ def get_current_user():
 
         payload = jwt.decode(token, JWT_SECRET, algorithms=['HS256'])
 
+        # real_name 已从 JWT 移除（避免 Cloudflare WAF 拦截），从数据库补查
+        db = get_db()
+        user_row = db.execute(
+            "SELECT real_name FROM users WHERE id=? AND status='active'",
+            (payload['user_id'],)
+        ).fetchone()
+        real_name = user_row['real_name'] if user_row else payload.get('username', '')
+
         return {
 
             'user_id': payload['user_id'],
 
             'role': payload['role'],
 
-            'real_name': payload.get('real_name', ''),
+            'real_name': real_name,
 
             'username': payload.get('username', ''),
 
@@ -507,8 +514,6 @@ def login():
         user_id=user['id'],
 
         role=user['role'],
-
-        real_name=user['real_name'] or user['username'],
 
         username=user['username'],
 
