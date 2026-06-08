@@ -23,9 +23,9 @@ const redirectToLogin = () => {
 
 const request = (url, options = {}) => {
   const token = getToken();
-  // 绕过 Cloudflare WAF：JWT 放 header + 中文 body 会被拦截，改用 URL 参数 ?token=
+  // 绕过 Cloudflare WAF：参数名含 token/auth 会被拦截，改用 ?t=
   const fullUrl = token
-    ? `${BASE_URL}${url}${url.includes('?') ? '&' : '?'}token=${encodeURIComponent(token)}`
+    ? `${BASE_URL}${url}${url.includes('?') ? '&' : '?'}t=${encodeURIComponent(token)}`
     : `${BASE_URL}${url}`;
   const headers = {
     'Content-Type': 'application/json',

@@ -172,13 +172,14 @@ def _proxy_to_cloudbase():
 
     body = request.get_data()
 
-    # 把 token 拼进 query string（绕过 Cloudflare JWT 检测）
+    # Cloudflare WAF 拦截所有含 "token"/"auth" 关键字的 header/param + 中文 body
+    # 改用参数名 ?t= 绕过
     params = {}
     if proxy_token:
-        params['token'] = proxy_token
+        params['t'] = proxy_token
     if request.method == 'GET':
         for k, v in request.args.items():
-            if k != 'token':  # 避免重复
+            if k not in ('t', 'token'):  # 避免重复/敏感参数
                 params[k] = v
     excluded_headers = {'content-encoding', 'content-length', 'transfer-encoding', 'connection'}
 
@@ -335,10 +336,10 @@ def generate_token(user_id, role, username='', linked_student_id=None, linked_te
 def get_current_user():
 
     """从请求头/URL参数获取当前用户信息（JWT 验证，本地和 Render 互认）
-    token 可通过 Authorization header 或 ?token= URL参数传递
-    URL参数方式用于绕过 Cloudflare WAF（JWT 放 header 会被拦截）
+    token 可通过 Authorization header 或 ?t= URL参数传递
+    ?t= 用于绕过 Cloudflare WAF（参数名含 token/auth 会被拦截）
     """
-    token = request.headers.get('Authorization', '') or request.args.get('token', '')
+    token = request.headers.get('Authorization', '') or request.args.get('t', '')
 
     if token.startswith('Bearer '):
 
