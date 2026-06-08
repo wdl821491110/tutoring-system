@@ -1,0 +1,123 @@
+<view class="page-container fade-in">
+  <!-- 自定义日期选择 + 胶囊筛选 -->
+  <view style="display:flex;gap:8px;align-items:center;margin-bottom:8px;">
+    <view class="date-input-wrap" style="flex:1;">
+      <input type="date" value="{{dateFilter}}" bindchange="onDateChange" placeholder="选择日期"/>
+    </view>
+    <view class="filter-action" style="height:40px;" bindtap="filterToday">今天</view>
+  </view>
+
+  <view class="filter-bar" style="margin-bottom:16px;">
+    <view class="filter-pill {{statusIdx===0?'filter-pill--active':''}}" bindtap="onStatusChange" data-idx="0">全部</view>
+    <view class="filter-pill {{statusIdx===1?'filter-pill--active':''}}" bindtap="onStatusChange" data-idx="1">待上课</view>
+    <view class="filter-pill {{statusIdx===2?'filter-pill--active':''}}" bindtap="onStatusChange" data-idx="2">已完成</view>
+    <view class="filter-pill {{statusIdx===3?'filter-pill--active':''}}" bindtap="onStatusChange" data-idx="3">已取消</view>
+  </view>
+
+  <!-- 骨架屏 -->
+  <view wx:if="{{loading}}">
+    <view class="skeleton-row" wx:for="{{[0,0,0,0,0]}}" wx:key="*this">
+      <view class="skeleton-row__body">
+        <view class="skeleton-text"></view>
+        <view class="skeleton-text"></view>
+      </view>
+    </view>
+  </view>
+
+  <!-- 排课列表 -->
+  <block wx:else>
+  <view wx:if="{{list.length>0}}">
+    <view class="section-title">排课列表 · {{list.length}}节</view>
+    <view
+      class="card slide-up"
+      wx:for="{{list}}"
+      wx:key="id"
+      style="padding:14px 16px;margin-bottom:10px;position:relative;overflow:hidden;"
+    >
+      <!-- 左侧色条 -->
+      <view style="position:absolute;left:0;top:0;bottom:0;width:4px;background:
+        {{item.status==='completed'?'var(--c-success)':item.status==='cancelled'?'var(--c-danger)':'var(--c-primary)'}};">
+      </view>
+      <view style="padding-left:4px;">
+        <view style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:4px;">
+          <text style="font-size:16px;font-weight:600;flex:1;">{{item.student_name}} · {{item.course_name}}</text>
+          <text class="tag
+            {{item.status==='completed'?'tag--green':item.status==='cancelled'?'tag--red':'tag--blue'}}">
+            {{item.status==='completed'?'已完成':item.status==='cancelled'?'已取消':'待上课'}}
+          </text>
+        </view>
+        <view class="text-sm text-gray" style="margin-bottom:2px;">
+          {{item.schedule_date}} {{item.start_time}}-{{item.end_time}}
+          <text wx:if="{{item.teacher_name}}"> · {{item.teacher_name}}</text>
+        </view>
+        <text class="text-xs text-gray">{{item.hours}}课时</text>
+        <view wx:if="{{item.status==='scheduled'}}" style="display:flex;gap:6px;margin-top:10px;">
+          <text wx:if="{{isAdmin||isTeacher}}" class="schedule-action schedule-action--primary" bindtap="doCheckin" data-id="{{item.id}}">✅ 签到消课</text>
+          <text wx:if="{{isAdmin||isTeacher}}" class="schedule-action schedule-action--danger" bindtap="doCancel" data-id="{{item.id}}">取消</text>
+          <text wx:if="{{isAdmin}}" class="schedule-action schedule-action--muted" bindtap="deleteSchedule" data-schedule="{{item}}">删除</text>
+        </view>
+      </view>
+    </view>
+  </view>
+
+  <!-- 空状态 -->
+  <view wx:if="{{list.length===0}}" class="empty-state">
+    <view class="empty-icon">📅</view>
+    <view class="empty-text">暂无排课数据</view>
+    <view class="empty-hint">{{dateFilter?'该日期暂未排课':'点击下方按钮开始排课'}}</view>
+  </view>
+
+  <!-- 自定义表单弹窗 -->
+  <view class="overlay" wx:if="{{showForm}}" catchtouchmove="noop">
+    <view class="overlay-mask" bindtap="closeForm"></view>
+    <view class="overlay-sheet slide-up">
+      <view class="overlay-header">
+        <text class="overlay-title">新增排课</text>
+        <text class="overlay-close" bindtap="closeForm">✕</text>
+      </view>
+      <view class="overlay-body">
+        <view class="form-row">
+          <text class="form-label">学生</text>
+          <picker style="flex:1;" range="{{studentNames}}" value="{{form.studentIdx}}" bindchange="onStudentChange">
+            <view class="form-picker-val">{{studentNames[form.studentIdx]||'请选择'}}</view>
+          </picker>
+        </view>
+        <view class="form-row">
+          <text class="form-label">课程</text>
+          <picker style="flex:1;" range="{{courseNames}}" value="{{form.courseIdx}}" bindchange="onCourseChange">
+            <view class="form-picker-val">{{courseNames[form.courseIdx]||'请选择'}}</view>
+          </picker>
+        </view>
+        <view class="form-row">
+          <text class="form-label">日期</text>
+          <input class="form-input" type="date" value="{{form.schedule_date}}" data-field="schedule_date" bindinput="onFormChange"/>
+        </view>
+        <view class="form-row">
+          <text class="form-label">时间</text>
+          <view style="display:flex;gap:6px;align-items:center;flex:1;">
+            <input class="form-input" type="time" value="{{form.start_time}}" data-field="start_time" bindinput="onFormChange" style="flex:1;"/>
+            <text style="color:#C7C7CC;font-size:14px;">至</text>
+            <input class="form-input" type="time" value="{{form.end_time}}" data-field="end_time" bindinput="onFormChange" style="flex:1;"/>
+          </view>
+        </view>
+        <view class="form-row">
+          <text class="form-label">课时</text>
+          <input class="form-input" type="number" value="{{form.hours}}" data-field="hours" bindinput="onFormChange"/>
+        </view>
+        <view class="form-row" style="align-items:flex-start;">
+          <text class="form-label" style="padding-top:8px;">备注</text>
+          <textarea class="form-textarea" placeholder="备注信息" value="{{form.notes}}" data-field="notes" bindinput="onFormChange"/>
+        </view>
+      </view>
+      <view class="overlay-footer">
+        <button class="overlay-btn overlay-btn--cancel" bindtap="closeForm">取消</button>
+        <button class="overlay-btn overlay-btn--confirm" bindtap="submitSchedule">确定</button>
+      </view>
+    </view>
+  </view>
+
+  <view wx:if="{{isAdmin}}" class="fixed-bottom">
+    <button class="fixed-btn" bindtap="showAdd">＋ 新增排课</button>
+  </view>
+  </block>
+</view>

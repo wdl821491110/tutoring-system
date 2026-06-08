@@ -1,0 +1,35 @@
+{
+  "pages": [
+    "pages/index/index",
+    "pages/students/students",
+    "pages/schedules/schedules",
+    "pages/records/records",
+    "pages/profile/profile",
+    "pages/login/login",
+    "pages/privacy/privacy"
+  ],
+  "window": {
+    "navigationBarBackgroundColor": "#07C160",
+    "navigationBarTitleText": "课消管理",
+    "navigationBarTextStyle": "white",
+    "backgroundColor": "#EDEDED"
+  },
+  "tabBar": {
+    "color": "#999999",
+    "selectedColor": "#07C160",
+    "backgroundColor": "#FFFFFF",
+    "borderStyle": "white",
+    "list": [
+      { "pagePath": "pages/index/index", "text": "首页", "iconPath": "images/tab-home.png", "selectedIconPath": "images/tab-home-a.png" },
+      { "pagePath": "pages/students/students", "text": "学生", "iconPath": "images/tab-stu.png", "selectedIconPath": "images/tab-stu-a.png" },
+      { "pagePath": "pages/schedules/schedules", "text": "排课", "iconPath": "images/tab-cal.png", "selectedIconPath": "images/tab-cal-a.png" },
+      { "pagePath": "pages/records/records", "text": "课时", "iconPath": "images/tab-rec.png", "selectedIconPath": "images/tab-rec-a.png" },
+      { "pagePath": "pages/profile/profile", "text": "我的", "iconPath": "images/tab-me.png", "selectedIconPath": "images/tab-me-a.png" }
+    ]
+  },
+  "style": "v2",
+  "sitemapLocation": "sitemap.json",
+  "useExtendedLib": {
+    "weui": true
+  }
+}

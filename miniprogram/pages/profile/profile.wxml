@@ -1,0 +1,75 @@
+<view class="page-container">
+  <!-- 骨架屏 -->
+  <view wx:if="{{loading}}" class="fade-in">
+    <view class="skeleton" style="height:120px;border-radius:14px;margin-bottom:16px;"></view>
+    <view class="skeleton" style="height:80px;border-radius:14px;margin-bottom:16px;"></view>
+    <view class="skeleton" style="height:100px;border-radius:14px;margin-bottom:16px;"></view>
+  </view>
+
+  <!-- 内容 -->
+  <view wx:else class="fade-in">
+    <!-- 用户信息卡片 -->
+    <view class="profile-hero card" style="text-align:center;padding-top:24px;padding-bottom:24px;">
+      <view class="profile-avatar">{{user.real_name?user.real_name[0]:'?'}}</view>
+      <view class="profile-name">{{user.real_name||user.username}}</view>
+      <view class="tag {{user.role==='admin'?'tag--green':user.role==='teacher'?'tag--blue':'tag--gold'}}" style="margin-top:6px;">
+        {{user.role==='admin'?'管理员':user.role==='teacher'?'教师':'家长'}}
+      </view>
+    </view>
+
+    <!-- 账号信息 -->
+    <view class="card" style="padding:0;overflow:hidden;">
+      <view class="section-title" style="padding:14px 16px 0;">账号信息</view>
+      <view class="profile-cell">
+        <text class="profile-cell-key">用户名</text>
+        <text class="profile-cell-val">{{user.username}}</text>
+      </view>
+      <view class="profile-cell">
+        <text class="profile-cell-key">角色</text>
+        <text class="profile-cell-val"> {{user.role==='admin'?'管理员':user.role==='teacher'?'教师':'家长'}}</text>
+      </view>
+    </view>
+
+    <!-- 数据管理 -->
+    <view wx:if="{{isAdmin}}" class="card" style="padding:0;overflow:hidden;">
+      <view class="section-title" style="padding:14px 16px 0;">数据管理</view>
+      <view class="profile-cell profile-cell--link" bindtap="downloadBackup">
+        <view>
+          <text class="profile-cell-key" style="display:block;">下载备份</text>
+          <text class="text-xs text-gray" style="display:block;margin-top:2px;">导出完整数据</text>
+        </view>
+        <view class="profile-cell-arrow">›</view>
+      </view>
+    </view>
+
+    <!-- 权限 -->
+    <view wx:if="{{userPerms}}" class="card" style="padding:0;overflow:hidden;">
+      <view class="section-title" style="padding:14px 16px 0;">我的权限</view>
+      <view class="profile-cell">
+        <text class="profile-cell-key">排课管理</text>
+        <text class="profile-cell-val {{userPerms.can_create_schedules?'text-green':'text-gray'}}">
+          {{userPerms.can_create_schedules?'✓ 已授权':'✗ 未授权'}}
+        </text>
+      </view>
+      <view class="profile-cell">
+        <text class="profile-cell-key">签到操作</text>
+        <text class="profile-cell-val {{userPerms.can_checkin?'text-green':'text-gray'}}">
+          {{userPerms.can_checkin?'✓ 已授权':'✗ 未授权'}}
+        </text>
+      </view>
+      <view class="profile-cell">
+        <text class="profile-cell-key">备份管理</text>
+        <text class="profile-cell-val {{userPerms.can_backup?'text-green':'text-gray'}}">
+          {{userPerms.can_backup?'✓ 已授权':'✗ 未授权'}}
+        </text>
+      </view>
+    </view>
+
+    <!-- 底部操作 -->
+    <view style="margin-top:32px;text-align:center;">
+      <view class="text-sm text-green mb-12" bindtap="goPrivacy">隐私政策</view>
+      <button class="logout-btn" bindtap="doLogout">退出登录</button>
+      <view class="text-xs" style="color:#C7C7CC;margin-top:16px;">课消管理系统 v4.0</view>
+    </view>
+  </view>
+</view>

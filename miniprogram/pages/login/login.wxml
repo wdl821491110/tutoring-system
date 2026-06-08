@@ -1,0 +1,52 @@
+<view class="login-page fade-in">
+  <!-- Logo 区 -->
+  <view class="login-hero">
+    <view class="login-logo-circle">
+      <text class="login-logo-icon">📚</text>
+    </view>
+    <view class="login-title">课消管理系统</view>
+    <view class="login-subtitle">辅导机构课时管理工具</view>
+  </view>
+
+  <!-- 输入区 — 卡片式 -->
+  <view class="login-form-card">
+    <view class="login-input-group">
+      <view class="login-input-icon">👤</view>
+      <input
+        class="login-input"
+        placeholder="请输入用户名"
+        placeholder-style="color:#C7C7CC;"
+        value="{{username}}"
+        bindinput="onInput"
+        data-key="username"
+        focus="{{true}}"
+      />
+    </view>
+    <view class="login-input-divider"></view>
+    <view class="login-input-group">
+      <view class="login-input-icon">🔒</view>
+      <input
+        class="login-input"
+        type="password"
+        placeholder="请输入密码"
+        placeholder-style="color:#C7C7CC;"
+        value="{{password}}"
+        bindinput="onInput"
+        data-key="password"
+      />
+    </view>
+  </view>
+
+  <!-- 登录按钮 -->
+  <view class="login-btn-wrap">
+    <button class="login-btn" loading="{{loading}}" bindtap="doLogin">
+      {{loading ? '登录中...' : '登 录'}}
+    </button>
+  </view>
+
+  <!-- 隐私 -->
+  <view class="login-footer">
+    <text style="color:#C7C7CC;">登录即表示同意</text>
+    <text class="login-privacy-link" bindtap="goPrivacy">《隐私政策》</text>
+  </view>
+</view>

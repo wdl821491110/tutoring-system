@@ -1,0 +1,86 @@
+<view class="page-container">
+  <!-- 骨架屏 -->
+  <view wx:if="{{loading}}" class="fade-in">
+    <view class="stat-grid stat-grid-2">
+      <view class="skeleton" style="height:90px;border-radius:14px;" wx:for="{{[0,0]}}" wx:key="*this"></view>
+    </view>
+    <view class="stat-grid stat-grid-2">
+      <view class="skeleton" style="height:90px;border-radius:14px;" wx:for="{{[0,0]}}" wx:key="*this"></view>
+    </view>
+    <view class="skeleton" style="height:120px;border-radius:14px;margin-bottom:16px;"></view>
+  </view>
+
+  <!-- 内容区 -->
+  <view wx:else class="fade-in">
+    <!-- 统计卡片行一 -->
+    <view class="stat-grid stat-grid-2">
+      <view class="stat-card stat-card--green stagger-item" style="animation-delay:0s;">
+        <view class="stat-icon">👨‍🎓</view>
+        <view class="stat-num">{{stats.total_students||0}}</view>
+        <view class="stat-label">在籍学生</view>
+      </view>
+      <view class="stat-card stat-card--gold stagger-item" style="animation-delay:0.1s;">
+        <view class="stat-icon">📅</view>
+        <view class="stat-num">{{stats.today_count||0}}</view>
+        <view class="stat-label">今日排课</view>
+      </view>
+    </view>
+
+    <!-- 统计卡片行二 -->
+    <view class="stat-grid stat-grid-2">
+      <view class="stat-card stat-card--purple stagger-item" style="animation-delay:0.15s;">
+        <view class="stat-icon">✅</view>
+        <view class="stat-num">{{stats.today_consumed||0}}</view>
+        <view class="stat-label">今日消课(课时)</view>
+      </view>
+      <view class="stat-card stat-card--red stagger-item" style="animation-delay:0.2s;">
+        <view class="stat-icon">📊</view>
+        <view class="stat-num">{{stats.total_remaining||0}}</view>
+        <view class="stat-label">剩余总课时</view>
+      </view>
+    </view>
+
+    <!-- 今日课程 — 时间轴 -->
+    <view wx:if="{{stats.today_schedules && stats.today_schedules.length > 0}}" class="card stagger-item" style="animation-delay:0.25s;">
+      <view class="section-title" style="margin-bottom:12px;">📅 今日课程</view>
+      <view class="timeline">
+        <view class="timeline-item" wx:for="{{stats.today_schedules}}" wx:key="id">
+          <view style="font-size:15px;font-weight:600;">{{item.student_name}} · {{item.course_name}}</view>
+          <view style="display:flex;align-items:center;gap:8px;margin-top:2px;">
+            <text style="font-size:13px;color:#8E8E93;">{{item.start_time}}-{{item.end_time}}</text>
+            <text class="tag tag--green">{{item.hours}}课时</text>
+          </view>
+          <view class="text-sm text-gray mt-4" wx:if="{{item.teacher_name}}">👨‍🏫 {{item.teacher_name}}</view>
+        </view>
+      </view>
+    </view>
+
+    <!-- 近30天排行 — 进度条 -->
+    <view wx:if="{{stats.course_ranking && stats.course_ranking.length > 0}}" class="card stagger-item" style="animation-delay:0.3s;">
+      <view class="section-title" style="margin-bottom:12px;">🏆 近30天消耗排行</view>
+      <view wx:for="{{stats.course_ranking}}" wx:key="name" style="margin-bottom:16px;">
+        <view style="display:flex;justify-content:space-between;align-items:baseline;margin-bottom:4px;">
+          <view>
+            <text style="font-size:15px;font-weight:500;">{{item.name}}</text>
+            <text style="font-size:12px;color:#8E8E93;margin-left:6px;">{{item.subject}}</text>
+          </view>
+          <text class="fw-bold" style="font-size:14px;">{{item.total_hours}}课时</text>
+        </view>
+        <view class="progress-bar">
+          <view
+            class="progress-bar__fill {{index===0?'':'progress-bar__fill--'+(index===1?'blue':index===2?'gold':'purple')}}"
+            style="width:{{item.total_hours>stats.course_ranking[0].total_hours?100:Math.round(item.total_hours/stats.course_ranking[0].total_hours*100)}}%;">
+          </view>
+        </view>
+        <text wx:if="{{item.teacher_name}}" class="text-xs text-gray" style="margin-top:2px;">{{item.teacher_name}}</text>
+      </view>
+    </view>
+
+    <!-- 今日无课 -->
+    <view wx:if="{{!stats.today_schedules || stats.today_schedules.length === 0}}" class="empty-state">
+      <view class="empty-icon">📅</view>
+      <view class="empty-text">暂无今日课程</view>
+      <view class="empty-hint">去「排课」页面安排课程吧</view>
+    </view>
+  </view>
+</view>

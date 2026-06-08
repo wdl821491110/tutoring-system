@@ -1,0 +1,91 @@
+/* ========================================
+   个人中心页
+   ======================================== */
+
+/* 用户头像 */
+.profile-hero {
+  margin-bottom: var(--space-md);
+}
+
+.profile-avatar {
+  width: 72px;
+  height: 72px;
+  margin: 0 auto 12px;
+  border-radius: 50%;
+  background: var(--c-primary-gradient);
+  color: #fff;
+  font-size: 30px;
+  font-weight: 700;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 6px 20px rgba(7,193,96,0.3);
+}
+
+.profile-name {
+  font-size: 20px;
+  font-weight: 700;
+  color: var(--c-text);
+}
+
+/* 单元格 */
+.profile-cell {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 14px 16px;
+  border-top: 1px solid var(--c-divider);
+}
+
+.profile-cell:first-child {
+  border-top: none;
+}
+
+.profile-cell--link {
+  cursor: pointer;
+}
+
+.profile-cell--link:active {
+  background: #F9F9F9;
+}
+
+.profile-cell-key {
+  font-size: 15px;
+  color: var(--c-text);
+}
+
+.profile-cell-val {
+  font-size: 14px;
+  color: var(--c-text-secondary);
+  font-weight: 500;
+}
+
+.profile-cell-arrow {
+  font-size: 20px;
+  color: var(--c-text-hint);
+  font-weight: 300;
+}
+
+/* 退出按钮 */
+.logout-btn {
+  width: 200px;
+  height: 40px;
+  font-size: 15px;
+  color: var(--c-danger);
+  background: var(--c-card);
+  border: 1px solid var(--c-danger);
+  border-radius: var(--r-md);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  margin: 0 auto;
+}
+
+.logout-btn::after {
+  border: none;
+}
+
+.logout-btn:active {
+  background: var(--c-danger-light);
+}

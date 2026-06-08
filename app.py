@@ -34,8 +34,6 @@ from datetime import datetime, date
 
 from flask import Flask, request, jsonify, render_template, g, send_file, after_this_request, Response
 
-
-
 # 打包后资源路径处理
 
 if getattr(sys, 'frozen', False):
@@ -45,8 +43,6 @@ if getattr(sys, 'frozen', False):
 else:
 
     BASE_DIR = os.path.dirname(os.path.abspath(__file__))
-
-
 
 app = Flask(__name__,
 
@@ -58,8 +54,6 @@ app.config['JSON_AS_ASCII'] = False
 
 app.config['MAX_CONTENT_LENGTH'] = 50 * 1024 * 1024  # 50MB上传限制
 
-
-
 # 错误日志
 
 ERROR_LOG = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'error.log')
@@ -68,17 +62,11 @@ logging.basicConfig(filename=ERROR_LOG, level=logging.ERROR,
 
                     format='%(asctime)s [%(levelname)s] %(message)s')
 
-
-
 from database import get_db, init_db, get_data_dir, DB_PATH
-
-
 
 # Token 存储 (内存，重启失效)
 
 TOKENS = {}  # token -> {'user_id': id, 'role': role, 'expires': timestamp}
-
-
 
 # ==================== 统一响应 ====================
 
@@ -92,21 +80,15 @@ def api_response(data=None, message='ok', code=200, http_status=200):
 
     return jsonify(body), http_status
 
-
-
 def api_error(message, code=400, http_status=400):
 
     return api_response(message=message, code=code, http_status=http_status)
-
-
 
 # ==================== 运行模式检测 ====================
 
 CLOUDBASE_API = 'https://wdl1110-d1g8w3lcf657b61fd.service.tcloudbase.com'
 
 IS_CLOUD = bool(os.environ.get('PORT') or os.environ.get('KUBERNETES_SERVICE_HOST') or os.path.exists('/.dockerenv'))
-
-
 
 # ==================== CORS ====================
 
@@ -116,17 +98,7 @@ def handle_local_proxy_or_cors():
 
     """本地模式：/api/* 请求代理到 CloudBase；CORS 预检放行"""
 
-    # 本地 exe 模式：API 全部转发到 CloudBase
-
-    # 本地模式：/api/auth/* 鉴权端点使用本地数据库，其它 API 代理到 CloudBase
-    if not IS_CLOUD and request.path.startswith('/api/') and not request.path.startswith('/api/auth/'):
-
-        return _proxy_to_cloudbase()
-
-
-
-    # CORS 预检处理
-
+    # CORS 预检处理（必须在代理之前）
     if request.method == 'OPTIONS' and request.path.startswith('/api/'):
 
         resp = app.make_default_options_response()
@@ -141,9 +113,10 @@ def handle_local_proxy_or_cors():
 
         return resp
 
+    # 本地 exe 模式：所有 /api/* 请求（含鉴权）转发到 CloudBase
+    if not IS_CLOUD and request.path.startswith('/api/'):
 
-
-
+        return _proxy_to_cloudbase()
 
 def _proxy_to_cloudbase():
 
@@ -209,8 +182,6 @@ def _proxy_to_cloudbase():
 
     return Response(resp.content, status=resp.status_code, headers=resp_headers)
 
-
-
 @app.after_request
 
 def add_cors_headers(response):
@@ -231,8 +202,6 @@ def add_cors_headers(response):
 
     return response
 
-
-
 # ==================== 全局错误处理 ====================
 
 @app.errorhandler(404)
@@ -246,7 +215,6 @@ def not_found_error(e):
     # 非 API 请求返回友好 HTML
     return '<h1>404 - 页面未找到</h1><p><a href="/">返回首页</a></p>', 404
 
-
 @app.errorhandler(500)
 
 def internal_error(e):
@@ -254,8 +222,6 @@ def internal_error(e):
     logging.error(f"500: {str(e)}", exc_info=True)
 
     return api_error('服务器内部错误', 500, 500)
-
-
 
 @app.errorhandler(Exception)
 
@@ -267,8 +233,6 @@ def handle_exception(e):
     logging.error(f"Exception: {str(e)}", exc_info=True)
     return api_error(f'服务器错误: {str(e)}', 500, 500)
 
-
-
 # ==================== DB 连接 ====================
 
 @app.before_request
@@ -276,8 +240,6 @@ def handle_exception(e):
 def before_request():
 
     g.db = get_db()
-
-
 
 @app.teardown_request
 
@@ -289,13 +251,9 @@ def teardown_request(exception):
 
         db.close()
 
-
-
 # ==================== 鉴权系统 ====================
 
 from werkzeug.security import generate_password_hash as _gen_pw_hash, check_password_hash
-
-
 
 def hash_password(password):
 
@@ -303,15 +261,11 @@ def hash_password(password):
 
     return _gen_pw_hash(password, method='pbkdf2:sha256', salt_length=16)
 
-
-
 def verify_password(stored_hash, password):
 
     """验证密码"""
 
     return check_password_hash(stored_hash, password)
-
-
 
 def generate_token():
 
@@ -322,8 +276,6 @@ def generate_token():
         token = secrets.token_hex(32)
 
     return token
-
-
 
 def get_current_user():
 
@@ -351,8 +303,6 @@ def get_current_user():
 
     return None
 
-
-
 def get_role_permissions(role):
 
     """获取指定角色的权限配置（带缓存）"""
@@ -373,10 +323,6 @@ def get_role_permissions(role):
 
             'can_view_all_data':0,'can_view_prices':0,'can_manage_users':0,'can_backup':0}
 
-
-
-
-
 def get_user_permission_override(user_id):
 
     """获取用户权限覆盖记录（-1=使用角色默认）"""
@@ -389,10 +335,6 @@ def get_user_permission_override(user_id):
         return dict(row)
 
     return None
-
-
-
-
 
 def get_effective_permissions(user):
 
@@ -426,10 +368,6 @@ def get_effective_permissions(user):
 
     return perms
 
-
-
-
-
 def teacher_course_ids(db, teacher_id):
 
     """获取教师所教课程ID列表（含多教师课程）"""
@@ -445,8 +383,6 @@ def teacher_course_ids(db, teacher_id):
     """, (teacher_id, teacher_id)).fetchall()
 
     return [r['id'] for r in rows]
-
-
 
 def require_auth(roles=None):
 
@@ -476,8 +412,6 @@ def require_auth(roles=None):
 
     return decorator
 
-
-
 # ==================== 健康检查 ====================
 
 @app.route('/api/health', methods=['GET'])
@@ -485,8 +419,6 @@ def require_auth(roles=None):
 def health():
 
     return api_response({'version': '3.0', 'status': 'running'})
-
-
 
 # ==================== 认证接口 ====================
 
@@ -502,13 +434,9 @@ def login():
 
     password = data.get('password') or ''
 
-
-
     if not username or not password:
 
         return api_error('请输入用户名和密码')
-
-
 
     user = db.execute(
 
@@ -516,13 +444,9 @@ def login():
 
     ).fetchone()
 
-
-
     if not user or not verify_password(user['password_hash'], password):
 
         return api_error('用户名或密码错误')
-
-
 
     token = generate_token()
 
@@ -543,8 +467,6 @@ def login():
         'created': time.time()
 
     }
-
-
 
     return api_response(data={
 
@@ -568,8 +490,6 @@ def login():
 
     }, message='登录成功')
 
-
-
 @app.route('/api/auth/logout', methods=['POST'])
 
 def logout():
@@ -583,8 +503,6 @@ def logout():
     TOKENS.pop(token, None)
 
     return api_response(message='已退出')
-
-
 
 @app.route('/api/auth/me', methods=['GET'])
 
@@ -606,8 +524,6 @@ def get_me():
 
     })
 
-
-
 @app.route('/api/auth/register', methods=['POST'])
 
 def register():
@@ -624,8 +540,6 @@ def register():
 
     role = data.get('role', 'teacher')
 
-
-
     if not username or not password:
 
         return api_error('请输入用户名和密码')
@@ -638,15 +552,11 @@ def register():
 
         return api_error('仅支持教师角色注册，管理员账号请联系机构创建')
 
-
-
     existing = db.execute("SELECT id FROM users WHERE username=?", (username,)).fetchone()
 
     if existing:
 
         return api_error('用户名已存在')
-
-
 
     db.execute("""
 
@@ -661,8 +571,6 @@ def register():
     db.commit()
 
     return api_response(message='注册成功，请联系管理员激活账号')
-
-
 
 # ==================== 用户管理（管理员端） ====================
 
@@ -690,8 +598,6 @@ def get_users():
 
     return api_response(data=[dict(u) for u in users])
 
-
-
 @app.route('/api/users', methods=['POST'])
 
 @require_auth(['admin'])
@@ -708,21 +614,15 @@ def create_user():
 
     role = data.get('role', 'teacher')
 
-
-
     if not username:
 
         return api_error('请输入用户名')
-
-
 
     existing = db.execute("SELECT id FROM users WHERE username=?", (username,)).fetchone()
 
     if existing:
 
         return api_error('用户名已存在')
-
-
 
     db.execute("""
 
@@ -740,8 +640,6 @@ def create_user():
 
     return api_response(data={'username': username, 'password': password}, message='创建成功')
 
-
-
 @app.route('/api/users/<int:uid>', methods=['PUT'])
 
 @require_auth(['admin'])
@@ -757,8 +655,6 @@ def update_user(uid):
     if not u:
 
         return api_error('用户不存在', 404, 404)
-
-
 
     updates = []
 
@@ -778,8 +674,6 @@ def update_user(uid):
 
         params.append(hash_password(data['password']))
 
-
-
     if updates:
 
         params.append(uid)
@@ -788,11 +682,7 @@ def update_user(uid):
 
         db.commit()
 
-
-
     return api_response(message='更新成功')
-
-
 
 @app.route('/api/users/<int:uid>', methods=['DELETE'])
 
@@ -808,8 +698,6 @@ def delete_user(uid):
 
     return api_response(message='已删除')
 
-
-
 # ==================== 首页 ====================
 
 @app.route('/')
@@ -817,8 +705,6 @@ def delete_user(uid):
 def index():
 
     return render_template('index.html')
-
-
 
 # ==================== 仪表盘 ====================
 
@@ -832,8 +718,6 @@ def dashboard():
 
     today = date.today().isoformat()
 
-
-
     # 权限过滤
 
     student_filter = ""
@@ -841,8 +725,6 @@ def dashboard():
     teacher_filter = ""
 
     params = []
-
-
 
     if user and user['role'] == 'teacher' and user.get('linked_teacher_id'):
 
@@ -856,8 +738,6 @@ def dashboard():
 
         params = [user['linked_student_id']]
 
-
-
     total_students = db.execute(f"SELECT COUNT(*) as c FROM students WHERE status='active'{student_filter}",
 
                                 params).fetchone()['c']
@@ -865,8 +745,6 @@ def dashboard():
     total_teachers = db.execute("SELECT COUNT(*) as c FROM teachers WHERE status='active'").fetchone()['c']
 
     total_courses = db.execute("SELECT COUNT(*) as c FROM courses WHERE status='active'").fetchone()['c']
-
-
 
     today_schedules = db.execute(f"""
 
@@ -886,8 +764,6 @@ def dashboard():
 
     """, [today] + params).fetchall()
 
-
-
     today_consumed = db.execute(f"""
 
         SELECT COALESCE(SUM(hours_consumed), 0) as total
@@ -896,8 +772,6 @@ def dashboard():
 
     """, [today] + params).fetchone()['total']
 
-
-
     total_remaining = db.execute(f"""
 
         SELECT COALESCE(SUM(remaining_hours), 0) as total
@@ -905,8 +779,6 @@ def dashboard():
         FROM enrollments e WHERE status = 'active'{student_filter}
 
     """, params).fetchone()['total']
-
-
 
     daily_stats = db.execute(f"""
 
@@ -926,8 +798,6 @@ def dashboard():
 
     """, params).fetchall()
 
-
-
     course_ranking = db.execute(f"""
 
         SELECT c.name, c.subject, COALESCE(SUM(cr.hours_consumed), 0) as total_hours
@@ -941,8 +811,6 @@ def dashboard():
         WHERE c.status = 'active' GROUP BY c.id ORDER BY total_hours DESC LIMIT 10
 
     """).fetchall()
-
-
 
     return api_response(data={
 
@@ -960,8 +828,6 @@ def dashboard():
 
     })
 
-
-
 # ==================== 辅助函数 ====================
 
 def get_course_teacher_names(db, course_id):
@@ -970,13 +836,9 @@ def get_course_teacher_names(db, course_id):
 
     return ', '.join(r['name'] for r in rows) if rows else ''
 
-
-
 def get_course_teacher_ids(db, course_id):
 
     return [r['teacher_id'] for r in db.execute("SELECT teacher_id FROM course_teachers WHERE course_id = ?", (course_id,)).fetchall()]
-
-
 
 def sync_course_teachers(db, course_id, teacher_ids):
 
@@ -992,8 +854,6 @@ def sync_course_teachers(db, course_id, teacher_ids):
 
     db.execute("UPDATE courses SET teacher_id = ? WHERE id = ?", (first, course_id))
 
-
-
 # ==================== 学生管理 ====================
 
 @app.route('/api/students', methods=['GET'])
@@ -1007,8 +867,6 @@ def get_students():
     search = request.args.get('search', '')
 
     status = request.args.get('status', 'active')
-
-
 
     if user and user['role'] == 'parent' and user.get('linked_student_id'):
 
@@ -1031,8 +889,6 @@ def get_students():
         students = db.execute("SELECT * FROM students WHERE status = ? ORDER BY updated_at DESC",
 
                               (status,)).fetchall()
-
-
 
     result = []
 
@@ -1057,8 +913,6 @@ def get_students():
         result.append(row)
 
     return api_response(data=result)
-
-
 
 @app.route('/api/students/<int:sid>', methods=['GET'])
 
@@ -1096,8 +950,6 @@ def get_student(sid):
 
     return api_response(data=row)
 
-
-
 @app.route('/api/students', methods=['POST'])
 
 @require_auth(['admin', 'teacher'])
@@ -1121,8 +973,6 @@ def create_student():
     db.commit()
 
     return api_response(data={'id': cursor.lastrowid}, message='添加成功')
-
-
 
 @app.route('/api/students/<int:sid>', methods=['PUT'])
 
@@ -1152,8 +1002,6 @@ def update_student(sid):
 
     return api_response(message='更新成功')
 
-
-
 @app.route('/api/students/<int:sid>', methods=['DELETE'])
 
 @require_auth(['admin', 'teacher'])
@@ -1167,8 +1015,6 @@ def delete_student(sid):
     db.commit()
 
     return api_response(message='已停用')
-
-
 
 # ==================== 教师管理 ====================
 
@@ -1204,8 +1050,6 @@ def get_teachers():
 
     return api_response(data=result)
 
-
-
 @app.route('/api/teachers', methods=['POST'])
 
 @require_auth(['admin'])
@@ -1225,8 +1069,6 @@ def create_teacher():
     db.commit()
 
     return api_response(data={'id': cursor.lastrowid}, message='添加成功')
-
-
 
 @app.route('/api/teachers/<int:tid>', methods=['PUT'])
 
@@ -1252,8 +1094,6 @@ def update_teacher(tid):
 
     return api_response(message='更新成功')
 
-
-
 @app.route('/api/teachers/<int:tid>', methods=['DELETE'])
 
 @require_auth(['admin'])
@@ -1264,8 +1104,6 @@ def delete_teacher(tid):
     db.commit()
 
     return api_response(message='已停用')
-
-
 
 # ==================== 课程管理（多教师） ====================
 
@@ -1278,8 +1116,6 @@ def get_courses():
     user = get_current_user()
 
     search = request.args.get('search', '')
-
-
 
     # 教师角色：仅显示自己教授的课程
 
@@ -1327,8 +1163,6 @@ def get_courses():
 
         courses = db.execute("SELECT c.* FROM courses c WHERE c.status = 'active' ORDER BY c.updated_at DESC").fetchall()
 
-
-
     result = []
 
     for c in courses:
@@ -1347,8 +1181,6 @@ def get_courses():
         result.append(row)
 
     return api_response(data=result)
-
-
 
 @app.route('/api/courses', methods=['POST'])
 
@@ -1371,8 +1203,6 @@ def create_course():
     db.commit()
 
     return api_response(data={'id': cursor.lastrowid}, message='添加成功')
-
-
 
 @app.route('/api/courses/<int:cid>', methods=['PUT'])
 
@@ -1400,8 +1230,6 @@ def update_course(cid):
 
     return api_response(message='更新成功')
 
-
-
 @app.route('/api/courses/<int:cid>', methods=['DELETE'])
 
 @require_auth(['admin'])
@@ -1413,8 +1241,6 @@ def delete_course(cid):
     g.db.commit()
 
     return api_response(message='已停用')
-
-
 
 # ==================== 报名管理 ====================
 
@@ -1428,8 +1254,6 @@ def get_enrollments():
         user = get_current_user()
 
         status = request.args.get('status', 'active')
-
-
 
         if user and user['role'] == 'parent' and user.get('linked_student_id'):
 
@@ -1478,8 +1302,6 @@ def get_enrollments():
                 WHERE e.status = ? ORDER BY e.enrolled_date DESC
 
             """, (status,)).fetchall()
-
-
 
         result = []
         for e in enrollments:
@@ -1545,8 +1367,6 @@ def create_enrollment():
 
     return api_response(data={'id': cursor.lastrowid}, message='报名成功')
 
-
-
 @app.route('/api/enrollments/<int:eid>', methods=['PUT'])
 
 @require_auth(['admin'])
@@ -1577,8 +1397,6 @@ def update_enrollment(eid):
 
     return api_response(message='更新成功')
 
-
-
 @app.route('/api/enrollments/<int:eid>', methods=['DELETE'])
 
 @require_auth(['admin'])
@@ -1590,8 +1408,6 @@ def delete_enrollment(eid):
     g.db.commit()
 
     return api_response(message='已取消报名')
-
-
 
 # ==================== 排课管理 ====================
 
@@ -1611,8 +1427,6 @@ def get_schedules():
 
                LEFT JOIN teachers t ON s.teacher_id = t.id WHERE 1=1"""
 
-
-
     if user and user['role'] == 'teacher' and user.get('linked_teacher_id'):
 
         query += " AND s.teacher_id = ?"; params.append(user['linked_teacher_id'])
@@ -1620,8 +1434,6 @@ def get_schedules():
     elif user and user['role'] == 'parent' and user.get('linked_student_id'):
 
         query += " AND s.student_id = ?"; params.append(user['linked_student_id'])
-
-
 
     for key, col in [('status','s.status'), ('date_from','s.schedule_date'), ('date_to','s.schedule_date'),
 
@@ -1641,8 +1453,6 @@ def get_schedules():
 
     return api_response(data=[dict(s) for s in db.execute(query, params).fetchall()])
 
-
-
 @app.route('/api/schedules', methods=['POST'])
 
 @require_auth(['admin', 'teacher'])
@@ -1655,8 +1465,6 @@ def create_schedule():
 
     data = request.get_json()
 
-
-
     # 教师角色需检查是否有排课权限
 
     if user['role'] == 'teacher':
@@ -1666,8 +1474,6 @@ def create_schedule():
         if not perms.get('can_create_schedules'):
 
             return api_error('无排课权限，请联系管理员开通', 403, 403)
-
-
 
     if not data.get('student_id') or not data.get('course_id'):
 
@@ -1697,8 +1503,6 @@ def create_schedule():
 
     return api_response(data={'id': cursor.lastrowid}, message='排课成功')
 
-
-
 @app.route('/api/schedules/<int:sid>', methods=['PUT'])
 
 @require_auth(['admin', 'teacher'])
@@ -1725,8 +1529,6 @@ def update_schedule(sid):
 
     return api_response(message='更新成功')
 
-
-
 @app.route('/api/schedules/<int:sid>/cancel', methods=['POST'])
 @app.route('/api/schedules/<int:sid>', methods=['DELETE'])
 
@@ -1739,8 +1541,6 @@ def cancel_schedule(sid):
     g.db.commit()
 
     return api_response(message='已取消排课')
-
-
 
 # ==================== 课时记录 ====================
 
@@ -1758,8 +1558,6 @@ def get_records():
 
                LEFT JOIN teachers t ON cr.teacher_id = t.id WHERE 1=1"""
 
-
-
     if user and user['role'] == 'teacher' and user.get('linked_teacher_id'):
 
         query += " AND cr.teacher_id = ?"; params.append(user['linked_teacher_id'])
@@ -1767,8 +1565,6 @@ def get_records():
     elif user and user['role'] == 'parent' and user.get('linked_student_id'):
 
         query += " AND cr.student_id = ?"; params.append(user['linked_student_id'])
-
-
 
     for key, col in [('date_from','cr.record_date'), ('date_to','cr.record_date'),
 
@@ -1783,8 +1579,6 @@ def get_records():
             elif key == 'date_to': query += f" AND {col} <= ?"; params.append(val)
 
             else: query += f" AND {col} = ?"; params.append(val)
-
-
 
     page = int(request.args.get('page', 1))
 
@@ -1806,8 +1600,6 @@ def get_records():
 
                               'per_page': per_page, 'total_pages': (count + per_page - 1) // per_page})
 
-
-
 @app.route('/api/records', methods=['POST'])
 
 @require_auth(['admin', 'teacher'])
@@ -1826,8 +1618,6 @@ def create_record():
 
     hours = int(data.get('hours_consumed', 1))
 
-
-
     if schedule_id:
 
         schedule = db.execute("SELECT * FROM schedules WHERE id=?", (schedule_id,)).fetchone()
@@ -1844,8 +1634,6 @@ def create_record():
 
     if not student_id or not course_id: return api_error('请选择学生和课程')
 
-
-
     enrollment = db.execute("SELECT * FROM enrollments WHERE student_id=? AND course_id=? AND status='active'",
 
                             (student_id, course_id)).fetchone()
@@ -1854,15 +1642,11 @@ def create_record():
 
     if enrollment['remaining_hours'] < hours: return api_error(f'剩余课时不足({enrollment["remaining_hours"]})')
 
-
-
     rb = enrollment['remaining_hours']; ra = rb - hours
 
     course = db.execute("SELECT * FROM courses WHERE id=?", (course_id,)).fetchone()
 
     teacher_id = data.get('teacher_id') or course['teacher_id']
-
-
 
     cursor = db.execute("""INSERT INTO class_records (schedule_id, student_id, course_id, teacher_id, record_date,
 
@@ -1885,8 +1669,6 @@ def create_record():
     db.commit()
 
     return api_response(data={'id': cursor.lastrowid, 'remaining_after': ra}, message='消课成功')
-
-
 
 @app.route('/api/records/batch-consume', methods=['POST'])
 
@@ -1946,8 +1728,6 @@ def batch_consume():
 
                         message=f'成功消课 {len(success)} 人' if success else '全部失败')
 
-
-
 @app.route('/api/records/<int:rid>', methods=['DELETE'])
 @app.route('/api/records/<int:rid>/undo', methods=['POST'])
 
@@ -1979,8 +1759,6 @@ def delete_record(rid):
 
     return api_response(message='消课记录已撤销')
 
-
-
 @app.route('/api/records/stats', methods=['GET'])
 
 def record_stats():
@@ -2006,8 +1784,6 @@ def record_stats():
                FROM class_records cr JOIN courses c ON cr.course_id = c.id WHERE {df} GROUP BY cr.course_id ORDER BY total_hours DESC""").fetchall()]
 
     return api_response(data={'total': total, 'by_course': by_course})
-
-
 
 @app.route('/api/records/batch-checkin', methods=['POST'])
 
@@ -2055,8 +1831,6 @@ def batch_checkin():
 
     return api_response(data={'success_count': success, 'fail_count': len(failed), 'fail_list': failed}, message=f'成功 {success} 条')
 
-
-
 @app.route('/api/students/active-with-enrollments', methods=['GET'])
 
 def active_students():
@@ -2085,8 +1859,6 @@ def active_students():
 
     return api_response(data=[dict(r) for r in rows])
 
-
-
 # ==================== 课时记录备注 ====================
 
 @app.route('/api/records/<int:rid>/notes', methods=['GET'])
@@ -2100,8 +1872,6 @@ def get_record_notes(rid):
     notes = db.execute("SELECT * FROM class_record_notes WHERE record_id = ? ORDER BY created_at DESC", (rid,)).fetchall()
 
     return api_response(data=[dict(n) for n in notes])
-
-
 
 @app.route('/api/records/<int:rid>/notes', methods=['POST'])
 
@@ -2129,8 +1899,6 @@ def add_record_note(rid):
 
     return api_response(message='备注已添加')
 
-
-
 @app.route('/api/records/<int:rid>/notes/<int:nid>', methods=['DELETE'])
 
 @require_auth(['admin'])
@@ -2144,10 +1912,6 @@ def delete_record_note(rid, nid):
     db.commit()
 
     return api_response(message='备注已删除')
-
-
-
-
 
 # ==================== 权限管理API ====================
 @app.route('/api/auth/permissions', methods=['GET'])
@@ -2164,8 +1928,6 @@ def get_my_permissions():
     perms = get_effective_permissions(user)
 
     return api_response(data=perms)
-
-
 
 @app.route('/api/admin/permissions', methods=['GET'])
 
@@ -2188,16 +1950,12 @@ def admin_get_permissions():
 
     })
 
-
-
 # 权限字段列表
 _PERM_FIELDS = ['can_manage_students','can_manage_teachers','can_manage_courses',
 
     'can_manage_enrollments','can_create_schedules','can_checkin',
 
     'can_view_all_data','can_view_prices','can_manage_users','can_backup']
-
-
 
 @app.route('/api/admin/permissions/<role>', methods=['PUT'])
 
@@ -2243,7 +2001,6 @@ def admin_update_permissions(role):
 
     return api_response(message='角色权限已更新')
 
-
 # ==================== 权限管理API ====================
 @app.route('/api/admin/users-permissions', methods=['GET'])
 
@@ -2257,8 +2014,6 @@ def admin_get_users_for_permissions():
     users = db.execute("SELECT id, username, role, real_name, phone, status FROM users WHERE status='active' ORDER BY role, username").fetchall()
 
     return api_response(data=[dict(u) for u in users])
-
-
 
 @app.route('/api/admin/user-permissions/<int:uid>', methods=['GET'])
 
@@ -2306,8 +2061,6 @@ def admin_get_user_permissions(uid):
 
     })
 
-
-
 @app.route('/api/admin/user-permissions/<int:uid>', methods=['PUT'])
 @require_auth(['admin'])
 def admin_update_user_permissions(uid):
@@ -2347,10 +2100,6 @@ def admin_reset_user_permissions(uid):
     db.commit()
     return api_response(message='已重置为角色默认权限')
 
-
-
-
-
 # ==================== 备份恢复 ====================
 
 @app.route('/api/backup/download', methods=['GET'])
@@ -2369,8 +2118,6 @@ def backup_download():
 
     backup_path = os.path.join(get_data_dir(), filename)
 
-
-
     # 使用 SQLite backup API
 
     import sqlite3
@@ -2383,15 +2130,11 @@ def backup_download():
 
     src.close(); dst.close()
 
-
-
     file_size = os.path.getsize(backup_path)
 
     db.execute("INSERT INTO backup_records (filename, file_size) VALUES (?, ?)", (filename, file_size))
 
     db.commit()
-
-
 
     @after_this_request
 
@@ -2403,13 +2146,9 @@ def backup_download():
 
         return response
 
-
-
     return send_file(backup_path, as_attachment=True, download_name=filename,
 
                      mimetype='application/octet-stream')
-
-
 
 @app.route("/api/backup/restore", methods=["POST"])
 
@@ -2481,18 +2220,11 @@ def backup_history():
     records = db.execute("SELECT * FROM backup_records ORDER BY created_at DESC LIMIT 50").fetchall()
     return api_response(data=[dict(r) for r in records])
 
-
-
-
-
-
 # ==================== 云存储自动同步 ====================
 
 _last_write_time = 0
 
 _backup_lock = threading.Lock()
-
-
 
 def trigger_cloud_backup():
 
@@ -2501,8 +2233,6 @@ def trigger_cloud_backup():
     global _last_write_time
 
     _last_write_time = time.time()
-
-
 
     def _delayed_backup():
 
@@ -2526,13 +2256,7 @@ def trigger_cloud_backup():
 
                     pass
 
-
-
     threading.Thread(target=_delayed_backup, daemon=True).start()
-
-
-
-
 
 @app.route('/api/backup/cloud-sync', methods=['POST'])
 
@@ -2569,7 +2293,6 @@ def cloud_sync():
     except Exception as e:
 
         return api_error(str(e), 500)
-
 
 @app.route('/api/backup/cloud-restore', methods=['POST'])
 @require_auth(['admin'])

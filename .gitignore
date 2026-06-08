@@ -1,0 +1,51 @@
+﻿# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+dist/
+build/
+*.spec
+
+# Virtual environment
+.venv/
+venv/
+
+# Data files
+data/*.db
+data/*.db-journal
+data/*.db-wal
+data/*.db-shm
+data/.tcb_cloud_object_id
+
+# CloudBase
+.cloudbase/
+.cloudbaserc
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Logs
+error.log
+cloud_backup.log
+
+# Environment
+tcb_api_key
+
+# Windows
+*.exe
+*.zip
+
+# Memory files (should be read from git history)
+.workbuddy/memory/*.md
+"!workbuddy/memory/MEMORY.md"
+
+# Node
+node_modules/
+package-lock.json
