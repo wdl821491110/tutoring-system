@@ -2,7 +2,7 @@
  * 统一网络请求封装
  * 提供 auth 注入、401 自动重登、错误兜底
  */
-const BASE_URL = 'https://wdl1110-d1g8w3lcf657b61fd.service.tcloudbase.com';
+const BASE_URL = 'https://tutoring-system-qqrf.onrender.com';
 const MAX_RETRIES = 1;
 
 const getToken = () => wx.getStorageSync('token') || '';

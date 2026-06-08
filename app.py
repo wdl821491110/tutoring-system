@@ -86,7 +86,7 @@ def api_error(message, code=400, http_status=400):
 
 # ==================== 运行模式检测 ====================
 
-CLOUDBASE_API = 'https://wdl1110-d1g8w3lcf657b61fd.service.tcloudbase.com'
+CLOUDBASE_API = 'https://tutoring-system-qqrf.onrender.com'
 
 IS_CLOUD = bool(os.environ.get('PORT') or os.environ.get('KUBERNETES_SERVICE_HOST') or os.path.exists('/.dockerenv'))
 
