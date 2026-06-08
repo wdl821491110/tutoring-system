@@ -123,10 +123,10 @@ def main():
             time.sleep(0.5)
             import webbrowser
             webbrowser.open(f'http://127.0.0.1:{port}')
-            # 后台预热（后续请求的 _ensure_warm 会立即通过）
-            import requests as _req
+            # 调用 app 的预热函数（设置共享状态 _proxy_warm_done）
             try:
-                _req.get('https://tutoring-system-qqrf.onrender.com/api/health', timeout=120)
+                from app import _ensure_warm
+                _ensure_warm()
             except Exception:
                 pass
         threading.Thread(target=_warm_and_open, daemon=True).start()

@@ -153,7 +153,7 @@ def _ensure_warm():
         return False
 
 def _proxy_to_cloudbase():
-    """将请求转发到 Render 后端，透明处理冷启动"""
+    """将请求转发到 Render 后端，快速尝试+预热重试"""
     target_url = CLOUDBASE_API + request.full_path.split('?')[0] if request.full_path.startswith('/api') else CLOUDBASE_API + request.path
     fwd_headers = {}
     for k, v in request.headers:
@@ -161,18 +161,48 @@ def _proxy_to_cloudbase():
             continue
         fwd_headers[k] = v
     body = request.get_data()
-    # Render冷启动透明等待（共享预热，避免并发重复）
-    if not _ensure_warm():
-        return api_error('后端服务正在启动中，请稍后重试', 502, 502)
-    try:
-        resp = requests.request(method=request.method, url=target_url, headers=fwd_headers, data=body,
-            params=request.args if request.method == 'GET' else None, timeout=60, allow_redirects=False)
-    except requests.exceptions.RequestException as e:
-        logging.error(f'代理请求失败: {e}')
-        return api_error('服务器连接失败，请稍后重试', 502, 502)
     excluded_headers = {'content-encoding', 'content-length', 'transfer-encoding', 'connection'}
-    resp_headers = [(k, v) for k, v in resp.raw.headers.items() if k.lower() not in excluded_headers]
-    return Response(resp.content, status=resp.status_code, headers=resp_headers)
+
+    def _do_request(timeout):
+        """发起代理请求，返回 (success, response_or_None)"""
+        try:
+            resp = requests.request(method=request.method, url=target_url,
+                headers=fwd_headers, data=body,
+                params=request.args if request.method == 'GET' else None,
+                timeout=timeout, allow_redirects=False)
+            ct = resp.headers.get('Content-Type', '')
+            if 'json' in ct:
+                return True, resp
+            # 非JSON响应（可能是Render冷启动HTML页面）
+            return False, resp
+        except requests.exceptions.RequestException as e:
+            return False, None
+
+    # 第1次：快速尝试（Render已热时1秒内返回）
+    ok, resp = _do_request(8)
+    if ok:
+        resp_headers = [(k, v) for k, v in resp.raw.headers.items() if k.lower() not in excluded_headers]
+        return Response(resp.content, status=resp.status_code, headers=resp_headers)
+
+    # 非JSON/网络错误 → 预热Render
+    if _proxy_warm_done:
+        # 已预热过但请求还是失败，可能是短暂网络波动，再试一次
+        ok, resp = _do_request(15)
+        if ok:
+            resp_headers = [(k, v) for k, v in resp.raw.headers.items() if k.lower() not in excluded_headers]
+            return Response(resp.content, status=resp.status_code, headers=resp_headers)
+        return api_error('服务器暂时不可用，请稍后重试', 502, 502)
+
+    # 首次预热（共享锁，避免并发）
+    if not _ensure_warm():
+        return api_error('后端服务正在启动中，请10秒后重试', 502, 502)
+
+    # 预热成功，重试请求
+    ok, resp = _do_request(30)
+    if ok:
+        resp_headers = [(k, v) for k, v in resp.raw.headers.items() if k.lower() not in excluded_headers]
+        return Response(resp.content, status=resp.status_code, headers=resp_headers)
+    return api_error('服务器连接失败，请稍后重试', 502, 502)
 
 
 def add_cors_headers(response):
