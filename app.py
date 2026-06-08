@@ -28,6 +28,15 @@ import webbrowser
 
 import requests  # PyInstaller 需要顶层导入才能自动打包
 
+import jwt  # JWT token 签名验证（本地和 Render 共用密钥，互相认可）
+
+# 代理预热共享状态（避免多个请求并发预热阻塞线程池）
+_proxy_warm_lock = threading.Lock()
+_proxy_warm_done = False
+
+# JWT 签名密钥（本地和 Render 必须一致，否则 token 互不认可）
+JWT_SECRET = 'tutoring-system-v3-secret-key-2026'
+
 from functools import wraps
 
 from datetime import datetime, date
@@ -64,9 +73,8 @@ logging.basicConfig(filename=ERROR_LOG, level=logging.ERROR,
 
 from database import get_db, init_db, get_data_dir, DB_PATH
 
-# Token 存储 (内存，重启失效)
-
-TOKENS = {}  # token -> {'user_id': id, 'role': role, 'expires': timestamp}
+# Token 使用 JWT 签名（不再使用内存字典存储）
+# 本地和 Render 共享相同 JWT_SECRET，本地签发的 token Render 也能验证
 
 # ==================== 统一响应 ====================
 
@@ -87,6 +95,10 @@ def api_error(message, code=400, http_status=400):
 # ==================== 运行模式检测 ====================
 
 CLOUDBASE_API = 'https://tutoring-system-qqrf.onrender.com'
+
+# 代理开关：True=业务数据走Render代理（需Render已部署JWT代码）
+# 小程序和电脑端数据互通必须开启
+USE_PROXY = True
 
 IS_CLOUD = bool(os.environ.get('PORT') or os.environ.get('KUBERNETES_SERVICE_HOST') or os.path.exists('/.dockerenv'))
 
@@ -113,10 +125,29 @@ def handle_local_proxy_or_cors():
 
         return resp
 
-    # 本地 exe 模式：所有 /api/* 请求（含鉴权）转发到 CloudBase
-    if not IS_CLOUD and request.path.startswith('/api/'):
+    # 本地 exe 模式：USE_PROXY=True 时 /api/* 转发到 CloudBase
+    if USE_PROXY and not IS_CLOUD and request.path.startswith('/api/'):
 
         return _proxy_to_cloudbase()
+
+def _ensure_warm():
+    """确保 Render 后端已启动，多线程共享预热状态（避免并发阻塞线程池）"""
+    global _proxy_warm_done
+    if _proxy_warm_done:
+        return True
+    with _proxy_warm_lock:
+        if _proxy_warm_done:
+            return True
+        for _ in range(8):
+            try:
+                hr = requests.get(f'{CLOUDBASE_API}/api/health', timeout=5)
+                if hr.status_code == 200 and 'json' in hr.headers.get('Content-Type', ''):
+                    _proxy_warm_done = True
+                    return True
+            except:
+                pass
+            time.sleep(2)
+        return False
 
 def _proxy_to_cloudbase():
     """将请求转发到 Render 后端，透明处理冷启动"""
@@ -127,19 +158,8 @@ def _proxy_to_cloudbase():
             continue
         fwd_headers[k] = v
     body = request.get_data()
-    # Render冷启动透明等待
-    import time as _time
-    warm = False
-    for _ in range(15):
-        try:
-            hr = requests.get(f'{CLOUDBASE_API}/api/health', timeout=8)
-            if hr.status_code == 200 and 'json' in hr.headers.get('Content-Type', ''):
-                warm = True
-                break
-        except:
-            pass
-        _time.sleep(10)
-    if not warm:
+    # Render冷启动透明等待（共享预热，避免并发重复）
+    if not _ensure_warm():
         return api_error('后端服务正在启动中，请稍后重试', 502, 502)
     try:
         resp = requests.request(method=request.method, url=target_url, headers=fwd_headers, data=body,
@@ -235,19 +255,35 @@ def verify_password(stored_hash, password):
 
     return check_password_hash(stored_hash, password)
 
-def generate_token():
+def generate_token(user_id, role, real_name='', username='', linked_student_id=None, linked_teacher_id=None):
 
-    token = secrets.token_hex(32)
+    """生成 JWT token（本地和 Render 共享密钥，互相认可）"""
 
-    while token in TOKENS:
+    payload = {
 
-        token = secrets.token_hex(32)
+        'user_id': user_id,
 
-    return token
+        'role': role,
+
+        'real_name': real_name,
+
+        'username': username,
+
+        'linked_student_id': linked_student_id,
+
+        'linked_teacher_id': linked_teacher_id,
+
+        'iat': int(time.time()),
+
+        'exp': int(time.time()) + 86400  # 24小时过期
+
+    }
+
+    return jwt.encode(payload, JWT_SECRET, algorithm='HS256')
 
 def get_current_user():
 
-    """从请求头获取当前用户信息"""
+    """从请求头获取当前用户信息（JWT 验证，本地和 Render 互认）"""
 
     token = request.headers.get('Authorization', '')
 
@@ -255,21 +291,38 @@ def get_current_user():
 
         token = token[7:]
 
-    if token in TOKENS:
+    if not token:
 
-        user_data = TOKENS[token]
+        return None
 
-        # 检查过期 (24小时)
+    try:
 
-        if time.time() - user_data.get('created', 0) > 86400:
+        payload = jwt.decode(token, JWT_SECRET, algorithms=['HS256'])
 
-            del TOKENS[token]
+        return {
 
-            return None
+            'user_id': payload['user_id'],
 
-        return user_data
+            'role': payload['role'],
 
-    return None
+            'real_name': payload.get('real_name', ''),
+
+            'username': payload.get('username', ''),
+
+            'linked_student_id': payload.get('linked_student_id'),
+
+            'linked_teacher_id': payload.get('linked_teacher_id')
+
+        }
+
+    except jwt.ExpiredSignatureError:
+
+        return None
+
+    except jwt.InvalidTokenError:
+
+        return None
+
 
 def get_role_permissions(role):
 
@@ -416,25 +469,21 @@ def login():
 
         return api_error('用户名或密码错误')
 
-    token = generate_token()
+    token = generate_token(
 
-    TOKENS[token] = {
+        user_id=user['id'],
 
-        'user_id': user['id'],
+        role=user['role'],
 
-        'username': user['username'],
+        real_name=user['real_name'] or user['username'],
 
-        'role': user['role'],
+        username=user['username'],
 
-        'real_name': user['real_name'] or user['username'],
+        linked_student_id=user['linked_student_id'],
 
-        'linked_student_id': user['linked_student_id'],
+        linked_teacher_id=user['linked_teacher_id']
 
-        'linked_teacher_id': user['linked_teacher_id'],
-
-        'created': time.time()
-
-    }
+    )
 
     return api_response(data={
 
@@ -468,7 +517,7 @@ def logout():
 
         token = token[7:]
 
-    TOKENS.pop(token, None)
+    # JWT 无状态设计，无需清除；token 24小时后自动过期
 
     return api_response(message='已退出')
 
