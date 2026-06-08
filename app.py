@@ -6,6 +6,8 @@
 
 """
 
+import base64
+
 import os
 
 import sys
@@ -172,14 +174,14 @@ def _proxy_to_cloudbase():
 
     body = request.get_data()
 
-    # Cloudflare WAF 拦截所有含 "token"/"auth" 关键字的 header/param + 中文 body
-    # 改用参数名 ?t= 绕过
-    params = {}
-    if proxy_token:
-        params['t'] = proxy_token
+    # Cloudflare WAF 拦截所有含 JWT + 中文 body 的请求
+    # 方案：token 放 ?t= 参数，body 做 base64 编码
+    params = {'t': proxy_token, 'b64': '1'} if proxy_token else {}
+    body_b64 = base64.b64encode(body).decode() if body and proxy_token else None
+    body_to_send = body_b64.encode() if body_b64 else body
     if request.method == 'GET':
         for k, v in request.args.items():
-            if k not in ('t', 'token'):  # 避免重复/敏感参数
+            if k not in ('t', 'b64', 'token'):
                 params[k] = v
     excluded_headers = {'content-encoding', 'content-length', 'transfer-encoding', 'connection'}
 
@@ -187,7 +189,7 @@ def _proxy_to_cloudbase():
         """发起代理请求，返回 (success, response_or_None)"""
         try:
             resp = requests.request(method=request.method, url=target_url,
-                headers=fwd_headers, data=body,
+                headers=fwd_headers, data=body_to_send,
                 params=params if params else None,
                 timeout=timeout, allow_redirects=False)
             ct = resp.headers.get('Content-Type', '')
@@ -279,6 +281,12 @@ def handle_exception(e):
 @app.before_request
 
 def before_request():
+
+    # 绕过 Cloudflare WAF：?b64=1 时自动 base64 解码请求体
+    if request.method in ('POST', 'PUT', 'PATCH') and request.args.get('b64') == '1':
+        raw = request.get_data()
+        if raw:
+            request._cached_data = base64.b64decode(raw)
 
     g.db = get_db()
 
