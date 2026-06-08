@@ -119,70 +119,38 @@ def handle_local_proxy_or_cors():
         return _proxy_to_cloudbase()
 
 def _proxy_to_cloudbase():
-
-    """将请求转发到 CloudBase 后端"""
-
+    """将请求转发到 Render 后端，透明处理冷启动"""
     target_url = CLOUDBASE_API + request.full_path.split('?')[0] if request.full_path.startswith('/api') else CLOUDBASE_API + request.path
-
-    
-
-    # 转发的请求头
-
     fwd_headers = {}
-
     for k, v in request.headers:
-
         if k.lower() in ('host', 'content-length'):
-
             continue
-
         fwd_headers[k] = v
-
-    
-
-    # 获取请求体
-
     body = request.get_data()
-
-    
-
+    # Render冷启动透明等待
+    import time as _time
+    warm = False
+    for _ in range(15):
+        try:
+            hr = requests.get(f'{CLOUDBASE_API}/api/health', timeout=8)
+            if hr.status_code == 200 and 'json' in hr.headers.get('Content-Type', ''):
+                warm = True
+                break
+        except:
+            pass
+        _time.sleep(10)
+    if not warm:
+        return api_error('后端服务正在启动中，请稍后重试', 502, 502)
     try:
-
-        resp = requests.request(
-
-            method=request.method,
-
-            url=target_url,
-
-            headers=fwd_headers,
-
-            data=body,
-
-            params=request.args if request.method == 'GET' else None,
-
-            timeout=30,
-
-            allow_redirects=False
-
-        )
-
+        resp = requests.request(method=request.method, url=target_url, headers=fwd_headers, data=body,
+            params=request.args if request.method == 'GET' else None, timeout=60, allow_redirects=False)
     except requests.exceptions.RequestException as e:
-
         logging.error(f'代理请求失败: {e}')
-
         return api_error('服务器连接失败，请稍后重试', 502, 502)
-
-    
-
-    # 构建响应 — Render冷启动返回非JSON时拦截
-    ct = resp.headers.get('Content-Type', '')
-    if resp.status_code >= 500 or (resp.status_code >= 400 and 'json' not in ct):
-        return api_error(f'后端服务繁忙(HTTP {resp.status_code})，请稍后重试', 502, 502)
     excluded_headers = {'content-encoding', 'content-length', 'transfer-encoding', 'connection'}
     resp_headers = [(k, v) for k, v in resp.raw.headers.items() if k.lower() not in excluded_headers]
     return Response(resp.content, status=resp.status_code, headers=resp_headers)
 
-@app.after_request
 
 def add_cors_headers(response):
 

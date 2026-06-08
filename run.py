@@ -118,11 +118,19 @@ def main():
 
     # 仅本地模式自动打开浏览器
     if not cloud_port and not is_docker:
-        def _open():
-            time.sleep(1.5)
+        # 后台预热 Render（冷启动需要30-60秒）
+        def _warm_and_open():
+            time.sleep(0.5)
+            import requests as _req, sys as _sys
+            try:
+                # 先ping一下预热
+                _req.get('https://tutoring-system-qqrf.onrender.com/api/health', timeout=120)
+            except Exception:
+                pass
+            time.sleep(1)
             import webbrowser
             webbrowser.open(f'http://127.0.0.1:{port}')
-        threading.Thread(target=_open, daemon=True).start()
+        threading.Thread(target=_warm_and_open, daemon=True).start()
 
     # 启动服务
     serve(app, host=host, port=port)

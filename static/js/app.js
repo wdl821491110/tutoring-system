@@ -26,14 +26,21 @@ async function api(url, options = {}) {
     if (!ct.includes('application/json')) {
         const text = await res.text();
         if (res.status === 503 || text.includes('503')) {
-            throw new Error('服务器维护中，请稍后重试（约1-2分钟）');
+            throw new Error('服务器正在启动中，请稍后重试（约30秒）');
         }
         if (res.status >= 500) {
             throw new Error('服务器错误(' + res.status + ')，请稍后重试');
         }
         throw new Error('服务器响应异常(' + res.status + ')');
     }
-    const json = await res.json();
+    // 安全解析JSON（防止冷启动返回HTML伪装成JSON Content-Type）
+    let text, json;
+    try {
+        text = await res.text();
+        json = JSON.parse(text);
+    } catch(e) {
+        throw new Error('服务器响应格式异常，请稍后重试');
+    }
     if (json.code === 401) { doLogout(); throw new Error('登录已过期'); }
     return json;
 }
