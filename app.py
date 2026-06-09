@@ -37,7 +37,7 @@ _proxy_warm_lock = threading.Lock()
 _proxy_warm_done = False
 
 # JWT 签名密钥（本地和 Render 必须一致，否则 token 互不认可）
-JWT_SECRET = os.environ.get("JWT_SECRET", None)
+JWT_SECRET = os.environ.get("JWT_SECRET") or "tutoring-system-v3-secret-key-2026"
 
 from functools import wraps
 
