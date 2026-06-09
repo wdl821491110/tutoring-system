@@ -37,7 +37,7 @@ _proxy_warm_lock = threading.Lock()
 _proxy_warm_done = False
 
 # JWT 签名密钥（本地和 Render 必须一致，否则 token 互不认可）
-JWT_SECRET = 'tutoring-system-v3-secret-key-2026'
+JWT_SECRET = os.environ.get("JWT_SECRET", None)
 
 from functools import wraps
 
@@ -117,7 +117,7 @@ def handle_local_proxy_or_cors():
 
         resp = app.make_default_options_response()
 
-        resp.headers['Access-Control-Allow-Origin'] = '*'
+        resp.headers['Access-Control-Allow-Origin'] = request.headers.get('Origin', '*')
 
         resp.headers['Access-Control-Allow-Methods'] = 'GET,POST,PUT,DELETE,OPTIONS'
 
@@ -177,16 +177,23 @@ def _proxy_to_cloudbase():
             try:
                 body = body.decode('gbk').encode('utf-8')
             except Exception:
-                pass
+                logging.warning(f'GBK body decode failed: {sys.exc_info()[1]}')
 
     # Cloudflare WAF 拦截所有含 JWT + 中文 body 的请求
     # 方案：token 放 ?t= 参数，body 做 base64 编码
-    params = {'t': proxy_token, 'b64': '1'} if proxy_token else {}
+    params = {'b64': '1'}
+    if proxy_token:
+        params['t'] = proxy_token
+    # Compatible with new ts+sig param
+    ts_param = request.args.get('ts', '')
+    if ts_param and not proxy_token:
+        proxy_token = ts_param
+        params['t'] = ts_param
     body_b64 = base64.b64encode(body).decode() if body and proxy_token else None
     body_to_send = body_b64  # str, 不要 encode 成 bytes
     if request.method == 'GET':
         for k, v in request.args.items():
-            if k not in ('t', 'b64', 'token'):
+            if k not in ('t', 'b64', 'token', 'ts', 'sig'):
                 params[k] = v
     excluded_headers = {'content-encoding', 'content-length', 'transfer-encoding', 'connection'}
 
@@ -234,7 +241,7 @@ def _proxy_to_cloudbase():
 
 def add_cors_headers(response):
 
-    response.headers['Access-Control-Allow-Origin'] = '*'
+    response.headers['Access-Control-Allow-Origin'] = request.headers.get('Origin', '*')
 
     response.headers['Access-Control-Allow-Headers'] = 'Content-Type,Authorization'
 
@@ -291,8 +298,9 @@ def before_request():
     if request.method in ('POST', 'PUT', 'PATCH') and request.args.get('b64') == '1':
         raw = request.get_data()
         if raw:
-            request._cached_data = base64.b64decode(raw)
-
+            decoded = base64.b64decode(raw)
+            request._cached_data = decoded
+            request.data = decoded
     g.db = get_db()
 
 @app.teardown_request
@@ -352,7 +360,7 @@ def get_current_user():
     token 可通过 Authorization header 或 ?t= URL参数传递
     ?t= 用于绕过 Cloudflare WAF（参数名含 token/auth 会被拦截）
     """
-    token = request.headers.get('Authorization', '') or request.args.get('t', '')
+    token = request.headers.get('Authorization', '') or request.args.get('t', '') or request.args.get('ts', '')
 
     if token.startswith('Bearer '):
 
@@ -2344,7 +2352,7 @@ def trigger_cloud_backup():
 
                 except Exception:
 
-                    pass
+                    logging.warning(f'Cloud backup failed: {sys.exc_info()[1]}')
 
     threading.Thread(target=_delayed_backup, daemon=True).start()
 
