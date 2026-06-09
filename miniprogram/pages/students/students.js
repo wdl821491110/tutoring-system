@@ -69,6 +69,12 @@ Page({
     });
   },
 
+  /** radio-group 绑定事件 */
+  onGenderChange(e) {
+    const value = e.detail.value;
+    this.setData({ 'form.gender': value });
+  },
+
   closeForm() {
     this.setData({ showForm: false });
   },

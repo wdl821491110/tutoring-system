@@ -100,7 +100,7 @@ CLOUDBASE_API = 'https://tutoring-system-qqrf.onrender.com'
 
 # 代理开关：True=业务数据走Render代理（需Render已部署JWT代码）
 # 小程序和电脑端数据互通必须开启
-USE_PROXY = True
+USE_PROXY = os.environ.get("USE_PROXY", "true").lower() not in ("false", "0", "no", "")
 
 IS_CLOUD = bool(os.environ.get('PORT') or os.environ.get('KUBERNETES_SERVICE_HOST') or os.path.exists('/.dockerenv'))
 
@@ -236,6 +236,7 @@ def _proxy_to_cloudbase():
     if ok:
         resp_headers = [(k, v) for k, v in resp.raw.headers.items() if k.lower() not in excluded_headers]
         return Response(resp.content, status=resp.status_code, headers=resp_headers)
+    logging.warning(f'Render 代理不可用，路径: {request.path}。建议检查网络或设置 USE_PROXY=false 使用本地数据库。')
     return api_error('服务器连接失败，请稍后重试', 502, 502)
 
 
@@ -256,6 +257,9 @@ def add_cors_headers(response):
             trigger_cloud_backup()
 
     return response
+
+# 注册 after_request：确保写操作后触发云备份，CORS 头正确设置
+app.after_request(add_cors_headers)
 
 # ==================== 全局错误处理 ====================
 
@@ -622,55 +626,6 @@ def get_me():
 
     })
 
-@app.route('/api/auth/register', methods=['POST'])
-
-def register():
-
-    """注册（仅限教师角色）"""
-
-    db = g.db
-
-    data = request.get_json()
-
-    username = (data.get('username') or '').strip()
-
-    password = data.get('password') or ''
-
-    role = data.get('role', 'teacher')
-
-    if not username or not password:
-
-        return api_error('请输入用户名和密码')
-
-    if len(password) < 6:
-
-        return api_error('密码至少6位')
-
-    if role != 'teacher':
-
-        return api_error('仅支持教师角色注册，管理员账号请联系机构创建')
-
-    existing = db.execute("SELECT id FROM users WHERE username=?", (username,)).fetchone()
-
-    if existing:
-
-        return api_error('用户名已存在')
-
-    db.execute("""
-
-        INSERT INTO users (username, password_hash, role, real_name, phone)
-
-        VALUES (?, ?, ?, ?, ?)
-
-    """, (username, hash_password(password), role, data.get('real_name', username),
-
-          data.get('phone', '')))
-
-    db.commit()
-
-    return api_response(message='注册成功，请联系管理员激活账号')
-
-# ==================== 用户管理（管理员端） ====================
 
 @app.route('/api/users', methods=['GET'])
 

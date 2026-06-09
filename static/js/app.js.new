@@ -76,11 +76,9 @@ async function doLogin() {
         STATE.token = json.data.token; STATE.user = json.data.user;
         localStorage.setItem('tutoring_token', STATE.token);
         localStorage.setItem('tutoring_user', JSON.stringify(STATE.user));
-        localStorage.setItem('tutoring_login_time', Date.now().toString());
         $('#loginOverlay').style.display = 'none';
         $('#mainApp').style.display = 'flex';
-        updateUIByRole(); updateUserDisplay();
-        switchPage('dashboard').catch(e => { toast('仪表盘加载失败: ' + e.message, 'error'); });
+        updateUIByRole(); switchPage('dashboard'); updateUserDisplay();
     } catch (e) { showLoginError('登录失败: ' + e.message); }
 }
 
@@ -88,14 +86,27 @@ function doLogout() {
     api('/api/auth/logout', { method: 'POST' }).catch(() => {});
     STATE.token = null; STATE.user = null;
     localStorage.removeItem('tutoring_token'); localStorage.removeItem('tutoring_user');
-    localStorage.removeItem('tutoring_login_time');
     $('#mainApp').style.display = 'none'; $('#loginOverlay').style.display = 'flex';
     $('#loginPassword').value = '';
 }
 
 function showLoginError(msg) { const el = $('#loginError'); el.textContent = msg; el.style.display = 'block'; }
 
+function showRegisterForm() { $('#loginOverlay').style.display = 'none'; $('#registerOverlay').style.display = 'flex'; }
+function hideRegisterForm() { $('#registerOverlay').style.display = 'none'; $('#loginOverlay').style.display = 'flex'; }
 
+async function doRegister() {
+    const u = $('#regUsername').value.trim(), p = $('#regPassword').value;
+    if (!u || !p) { $('#regError').textContent = '请填写用户名和密码'; $('#regError').style.display = 'block'; return; }
+    if (p.length < 6) { $('#regError').textContent = '密码至少6位'; $('#regError').style.display = 'block'; return; }
+    try {
+        const json = await api('/api/auth/register', { method: 'POST',
+            body: JSON.stringify({ username: u, password: p, role: $('#regRole').value,
+                real_name: $('#regRealName').value.trim(), phone: $('#regPhone').value.trim() }) });
+        if (json.code !== 200) { $('#regError').textContent = json.message; $('#regError').style.display = 'block'; return; }
+        toast(json.message, 'success'); hideRegisterForm();
+    } catch (e) { $('#regError').textContent = '注册失败'; $('#regError').style.display = 'block'; }
+}
 
 function updateUserDisplay() {
     if (!STATE.user) return;
@@ -138,60 +149,16 @@ function updateUIByRole() {
 
 function tryAutoLogin() {
     const tok = localStorage.getItem('tutoring_token'), usr = localStorage.getItem('tutoring_user');
-    if (!tok || !usr) return;
-    if (!checkIdleTimeout()) {
-        localStorage.removeItem('tutoring_token');
-        localStorage.removeItem('tutoring_user');
-        localStorage.removeItem('tutoring_login_time');
-        return;
+    if (tok && usr) {
+        STATE.token = tok; STATE.user = JSON.parse(usr);
+        api('/api/auth/me').then(res => {
+            if (res.code === 200) {
+                STATE.user = res.data;
+                $('#loginOverlay').style.display = 'none'; $('#mainApp').style.display = 'flex';
+                updateUIByRole(); switchPage('dashboard'); updateUserDisplay();
+            } else { localStorage.removeItem('tutoring_token'); localStorage.removeItem('tutoring_user'); }
+        }).catch(() => {});
     }
-    STATE.token = tok; STATE.user = JSON.parse(usr);
-    api('/api/auth/me').then(function(res) {
-        if (res.code === 200) {
-            STATE.user = res.data;
-            $('#loginOverlay').style.display = 'none'; $('#mainApp').style.display = 'flex';
-            updateUIByRole(); updateUserDisplay();
-            switchPage('dashboard').catch(function(e) { toast('仪表盘加载失败: ' + e.message, 'error'); });
-            resetIdleTimer();
-        } else { localStorage.removeItem('tutoring_token'); localStorage.removeItem('tutoring_user'); localStorage.removeItem('tutoring_login_time'); }
-    }).catch(function() {});
-}
-
-
-// ==================== 空闲超时控制（5分钟无操作退出）====================
-const IDLE_TIMEOUT_MS = 5 * 60 * 1000;
-let idleTimer = null;
-
-function resetIdleTimer() {
-    localStorage.setItem('tutoring_login_time', Date.now().toString());
-    if (idleTimer) {
-        clearTimeout(idleTimer);
-    }
-    if (STATE.token) {
-        idleTimer = setTimeout(function() {
-            if (STATE.token) {
-                toast('已登录超时，请重新登录', 'info');
-                doLogout();
-            }
-        }, IDLE_TIMEOUT_MS);
-    }
-}
-
-function checkIdleTimeout() {
-    var loginTimeStr = localStorage.getItem('tutoring_login_time');
-    if (!loginTimeStr) return false;
-    var elapsed = Date.now() - parseInt(loginTimeStr, 10);
-    if (elapsed > IDLE_TIMEOUT_MS) {
-        return false;
-    }
-    return true;
-}
-
-function setupIdleListener() {
-    var events = ['mousedown', 'keydown', 'touchstart', 'scroll', 'mousemove'];
-    events.forEach(function(evt) {
-        document.addEventListener(evt, resetIdleTimer, { capture: true, passive: true });
-    });
 }
 
 // ==================== 导航 ====================
@@ -215,8 +182,7 @@ function switchPage(page) {
     const loaders = { dashboard: loadDashboard, students: loadStudents, teachers: loadTeachers,
         courses: loadCourses, enrollments: loadEnrollments, schedules: loadSchedules,
         records: () => loadRecords(), users: loadUsers, backup: loadBackup, permissions: loadPermissions };
-    const p = loaders[page] ? loaders[page]() : null;
-    return p;
+    if (loaders[page]) loaders[page]();
 }
 
 // ==================== 弹窗 ====================
@@ -254,13 +220,7 @@ async function loadDashboard() {
                 const act = s.status==='scheduled'?`<button class="btn btn-success btn-xs" onclick="checkinSchedule(${s.id})">签到消课</button>`:'';
                 return `<tr><td>${s.start_time} - ${s.end_time}</td><td class="font-bold">${s.student_name}</td><td>${s.course_name}</td><td>${s.subject||'-'}</td><td>${s.teacher_name||'-'}</td><td>${s.hours}</td><td>${st}</td><td>${act}</td></tr>`;
             }).join('');
-    } catch (e) {
-        toast('加载失败，请检查网络连接', 'error');
-        $('#dashboardStats').innerHTML = '<div class="empty-state"><div class="empty-text" style="font-size:16px;">⚠️ 数据加载失败</div><div style="color:#9CA3AF;margin-top:8px;">请检查网络连接或稍后重试</div></div>';
-        $('#weekChart').innerHTML = '';
-        $('#courseRanking').innerHTML = '';
-        $('#todayScheduleTable').innerHTML = '<tr><td colspan="8"><div class="empty-state"><div class="empty-text">暂无排课数据</div></div></td></tr>';
-    }
+    } catch (e) { toast('加载失败', 'error'); }
 }
 
 async function checkinSchedule(sid) {
@@ -592,11 +552,6 @@ async function loadBackup(){
     tbody.innerHTML=history.map(h=>`<tr><td>${h.filename}</td><td>${(h.file_size/1024).toFixed(1)}KB</td><td>${h.created_at}</td></tr>`).join('');
 }
 
-
-async function loadPermissions() {
-    showPermTab('roles');
-}
-
 function downloadBackup(){
     fetch(API_BASE + '/api/backup/download',{headers:{'Authorization':`Bearer ${STATE.token}`}})
         .then(r=>r.blob()).then(blob=>{
@@ -880,5 +835,5 @@ async function resetUserPerms(uid) {
 }
 
 // ==================== 初始化 ====================
-function init(){initNavigation();bindFilters();setupIdleListener();tryAutoLogin();}
+function init(){initNavigation();bindFilters();tryAutoLogin();}
 document.addEventListener('DOMContentLoaded', init);

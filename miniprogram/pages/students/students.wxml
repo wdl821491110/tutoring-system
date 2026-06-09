@@ -1,4 +1,4 @@
-<view class="page-container fade-in">
+﻿<view class="page-container fade-in">
   <!-- 自定义搜索栏 -->
   <view class="custom-search">
     <view class="custom-search-icon">🔍</view>
@@ -87,12 +87,14 @@
         <view class="form-row">
           <text class="form-label">性别</text>
           <view style="display:flex;gap:20px;flex:1;justify-content:flex-end;">
-            <label style="display:flex;align-items:center;gap:4px;">
-              <radio value="男" checked="{{form.gender==='男'}}" bindchange="onFieldChange" data-field="gender" color="#07C160"/>男
-            </label>
-            <label style="display:flex;align-items:center;gap:4px;">
-              <radio value="女" checked="{{form.gender==='女'}}" bindchange="onFieldChange" data-field="gender" color="#07C160"/>女
-            </label>
+            <radio-group bindchange="onGenderChange" style="display:flex;gap:20px;align-items:center;">
+              <label style="display:flex;align-items:center;gap:4px;">
+                <radio value="男" checked="{{form.gender==='男'}}" color="#07C160"/>男
+              </label>
+              <label style="display:flex;align-items:center;gap:4px;">
+                <radio value="女" checked="{{form.gender==='女'}}" color="#07C160"/>女
+              </label>
+            </radio-group>
           </view>
         </view>
         <view class="form-row">

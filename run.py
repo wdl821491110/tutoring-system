@@ -107,6 +107,15 @@ def main():
         host = '127.0.0.1'
 
     print(f"课消管理系统 v3.1 启动: {host}:{port}")
+    # 显示代理模式状态
+    from app import USE_PROXY as _use_proxy, IS_CLOUD as _is_cloud
+    if _is_cloud:
+        print("运行模式: 云端 CloudRun（直接读写本地 SQLite + 云备份）")
+    elif _use_proxy:
+        print("运行模式: 本地 exe + 代理到 Render 云端（三端数据互通）")
+        print("提示: 如需本地独立运行不依赖 Render，设置环境变量 USE_PROXY=false")
+    else:
+        print("运行模式: 本地 exe（直接读写本地 SQLite，独立运行）")
     print(f"数据目录: {get_data_dir()}")
     if _should_use_cloud():
         print("云备份: 已启用（自动备份到CloudBase云存储）")

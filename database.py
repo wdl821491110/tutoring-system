@@ -105,6 +105,7 @@ def init_db():
             phone TEXT,
             linked_student_id INTEGER,
             linked_teacher_id INTEGER,
+            force_password_change INTEGER DEFAULT 0,
             status TEXT DEFAULT 'active',
             created_at TIMESTAMP DEFAULT (datetime('now', 'localtime')),
             FOREIGN KEY (linked_student_id) REFERENCES students(id) ON DELETE SET NULL,
@@ -246,22 +247,45 @@ def init_db():
     from werkzeug.security import generate_password_hash
     admin = cursor.execute("SELECT id FROM users WHERE username = 'admin'").fetchone()
     reset_flag = os.environ.get('RESET_ADMIN', '').strip().lower() in ('1', 'true', 'yes')
+    force_change_flag = os.environ.get('FORCE_CHANGE_PASS', '').strip().lower() in ('1', 'true', 'yes')
+
     if not admin:
         cursor.execute(
-            "INSERT INTO users (username, password_hash, role, real_name) VALUES (?, ?, ?, ?)",
-            ('admin', generate_password_hash('admin123', method='pbkdf2:sha256', salt_length=16), 'admin', '系统管理员')
+            "INSERT INTO users (username, password_hash, role, real_name, force_password_change) VALUES (?, ?, ?, ?, ?)",
+            ('admin', generate_password_hash('admin123', method='pbkdf2:sha256', salt_length=16), 'admin', '系统管理员', 1)
         )
         conn.commit()
-        print("已创建默认管理员: admin / admin123")
+        print("已创建默认管理员: admin / admin123 (首次登录需修改密码)")
+        print("如需修改初始密码，设置环境变量 FORCE_CHANGE_PASS=1")
     elif reset_flag:
         cursor.execute(
-            "UPDATE users SET password_hash = ? WHERE username = 'admin'",
+            "UPDATE users SET password_hash = ?, force_password_change = 0 WHERE username = 'admin'",
             (generate_password_hash('admin123', method='pbkdf2:sha256', salt_length=16),)
         )
         conn.commit()
         print("管理员密码已重置为: admin123")
+    elif force_change_flag:
+        cursor.execute(
+            "UPDATE users SET force_password_change = 1 WHERE username = 'admin'",
+            ()
+        )
+        conn.commit()
+        print("管理员强制改密标记已设置（下次登录需修改密码）")
+
+    # 确保 force_password_change 列存在（数据库升级兼容）
+    try:
+        cursor.execute("PRAGMA table_info(users)")
+        columns = [row['name'] if isinstance(row, dict) else row[1] for row in cursor.fetchall()]
+        if 'force_password_change' not in columns:
+            cursor.execute("ALTER TABLE users ADD COLUMN force_password_change INTEGER DEFAULT 0")
+            conn.commit()
+            print("已添加 force_password_change 列到 users 表")
+    except Exception:
+        pass
 
     conn.close()
+    print(f"数据库就绪: {DB_PATH}")
+
     print(f"数据库就绪: {DB_PATH}")
 
 

@@ -400,25 +400,6 @@ body {
     gap: 12px;
 }
 
-/* ============ 搜索框 ============ */
-.search-box {
-    position: relative;
-}
-
-.search-box .form-input {
-    padding-left: 34px;
-}
-
-.search-box .search-icon {
-    position: absolute;
-    left: 10px;
-    top: 50%;
-    transform: translateY(-50%);
-    color: var(--gray-400);
-    font-size: 15px;
-    pointer-events: none;
-}
-
 /* ============ 表格 ============ */
 .table-wrap {
     overflow-x: auto;
@@ -1131,6 +1112,30 @@ table tbody tr.clickable {
 .select-group select { min-width: 120px; }
 
 /* 搜索框 */
-.search-box { display: flex; align-items: center; gap: 8px; padding: 6px 12px; background: var(--gray-50); border: 2px solid var(--gray-200); border-radius: 10px; }
-.search-box:focus-within { border-color: var(--primary); }
-.search-icon { color: var(--gray-400); }
+.search-box {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 6px 12px;
+    background: var(--gray-50);
+    border: 2px solid var(--gray-200);
+    border-radius: 10px;
+    flex: 1;
+    min-width: 150px;
+}
+.search-box:focus-within {
+    border-color: var(--primary);
+}
+.search-box .form-input {
+    flex: 1;
+    border: none;
+    background: transparent;
+    padding: 4px 0;
+    outline: none;
+    font-size: 14px;
+}
+.search-icon {
+    flex-shrink: 0;
+    color: var(--gray-400);
+    font-size: 15px;
+}
