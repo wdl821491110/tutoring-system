@@ -73,7 +73,7 @@ def download_db(save_path):
     # 使用 objectList 模式获取下载信息（与 upload 对称，不依赖本地缓存）
     try:
         resp = requests.post(
-            f'{GATEWAY}/v1/storages/get-objects-download-info',
+            f'{GATEWAY}/v1/storages/get-objects-upload-info',
             headers={'Content-Type': 'application/json', 'Authorization': f'Bearer {api_key}'},
             json=[{'objectId': CLOUD_BACKUP_PATH}],
             timeout=15
