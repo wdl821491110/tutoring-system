@@ -3,9 +3,9 @@
  * 新增：登录鉴权、角色控制、备份恢复、用户管理
  */
 // ==================== 全局状态 ====================
-// 本地 exe：通过 Flask 代理访问 CloudBase（同源，无跨域问题）
+// PC 端和小程序端直连 CloudBase CloudRun，共享同一套 API 和数据库
 // 小程序：使用 miniprogram/app.js 中的 BASE_URL 直连 CloudBase
-const API_BASE = '';
+const API_BASE = 'https://tutoring-268460-4-1441821069.sh.run.tcloudbase.com';
 const STATE = { currentPage: 'dashboard', students: [], teachers: [], courses: [], editingId: null, token: null, user: null };
 
 // ==================== 工具 ====================

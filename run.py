@@ -116,6 +116,18 @@ def main():
         t = threading.Thread(target=cloud_backup_loop, args=(300,), daemon=True)
         t.start()
 
+    # CloudBase 冷启动预热：先请求 /api/health 唤醒容器
+    try:
+        import urllib.request
+        import time as _time
+        _time.sleep(0.5)
+        try:
+            urllib.request.urlopen("http://127.0.0.1:8899/api/health", timeout=3)
+        except Exception:
+            pass  # 预热失败不影响启动
+    except Exception:
+        pass
+
     # 仅本地模式自动打开浏览器
     if not cloud_port and not is_docker:
         time.sleep(1)
