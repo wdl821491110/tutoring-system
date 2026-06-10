@@ -1,10 +1,10 @@
-import os
+﻿import os
 import time
 import logging
 
 logger = logging.getLogger(__name__)
 
-ENV_ID = os.environ.get('TCB_ENV_ID', 'wdl1110-d1g8w3lcf657b61fd')
+ENV_ID = os.environ.get('TCB_ENV_ID', 'touring-d1g3bubk681ee89e9')
 GATEWAY = f'https://{ENV_ID}.api.tcloudbasegateway.com'
 CLOUD_BACKUP_PATH = 'backup/tutoring.db'
 _CACHE_FILE = os.path.join(os.path.dirname(os.path.abspath(__file__)), '.tcb_cloud_object_id')
@@ -30,7 +30,9 @@ def _get_cloud_object_id():
     try:
         if os.path.exists(_CACHE_FILE):
             with open(_CACHE_FILE, 'r') as f:
-                return f.read().strip()
+                content = f.read().strip()
+                if content:
+                    return content
     except Exception:
         pass
     return ''
@@ -98,37 +100,65 @@ def download_db(save_path):
     api_key = _get_api_key()
     if not api_key:
         return False
+
+    # 优先尝试 cloudObjectId
     cloud_id = _get_cloud_object_id()
-    if not cloud_id:
-        logger.info('无 cloudObjectId 缓存，跳过云端恢复')
-        return False
+    if cloud_id:
+        try:
+            resp = requests.post(
+                f'{GATEWAY}/v1/storages/get-objects-download-info',
+                headers={'Content-Type': 'application/json', 'Authorization': f'Bearer {api_key}'},
+                json=[{'cloudObjectId': cloud_id}],
+                timeout=15
+            )
+            if resp.status_code == 200:
+                result_list = resp.json()
+                if isinstance(result_list, list) and len(result_list) > 0:
+                    item = result_list[0]
+                    if 'code' not in item:
+                        download_url = item.get('downloadUrl', '')
+                        if download_url:
+                            dl_resp = requests.get(download_url, timeout=30)
+                            if dl_resp.status_code == 200 and len(dl_resp.content) >= 1000:
+                                os.makedirs(os.path.dirname(save_path), exist_ok=True)
+                                with open(save_path, 'wb') as f:
+                                    f.write(dl_resp.content)
+                                logger.info(f'从云存储恢复数据库成功 ({len(dl_resp.content)} bytes)')
+                                return True
+        except Exception as e:
+            logger.warning(f'cloudObjectId 下载异常: {e}')
+
+    # fallback: 直接用 fileid 下载
     try:
+        fileid = CLOUD_BACKUP_PATH  # backup/tutoring.db
         resp = requests.post(
-            f'{GATEWAY}/v1/storages/get-objects-download-info',
+            f'{GATEWAY}/v1/storages/get-object-download-info',
             headers={'Content-Type': 'application/json', 'Authorization': f'Bearer {api_key}'},
-            json=[{'cloudObjectId': cloud_id}],
+            json={'fileid': fileid},
             timeout=15
         )
         if resp.status_code != 200:
-            logger.warning(f'获取下载链接失败: HTTP {resp.status_code}')
+            logger.warning(f'fallback 下载失败 HTTP {resp.status_code}')
             return False
-        result_list = resp.json()
-        if not isinstance(result_list, list) or len(result_list) == 0:
-            return False
-        item = result_list[0]
-        if 'code' in item:
-            return False
-        download_url = item.get('downloadUrl', '')
+        data = resp.json()
+        download_url = data.get('downloadUrl', '')
         if not download_url:
+            if isinstance(data, list) and len(data) > 0:
+                download_url = data[0].get('downloadUrl', '')
+        if not download_url:
+            logger.warning('downloadUrl 为空')
             return False
         dl_resp = requests.get(download_url, timeout=30)
-        if dl_resp.status_code != 200 or len(dl_resp.content) < 1000:
-            return False
-        os.makedirs(os.path.dirname(save_path), exist_ok=True)
-        with open(save_path, 'wb') as f:
-            f.write(dl_resp.content)
-        logger.info(f'从云存储恢复数据库成功 ({len(dl_resp.content)} bytes)')
-        return True
+        if dl_resp.status_code == 200 and len(dl_resp.content) >= 1000:
+            os.makedirs(os.path.dirname(save_path), exist_ok=True)
+            with open(save_path, 'wb') as f:
+                f.write(dl_resp.content)
+            logger.info(f'从云存储恢复数据库成功 ({len(dl_resp.content)} bytes)')
+            return True
+        else:
+            logger.warning(f'下载数据异常: HTTP {dl_resp.status_code}, size={len(dl_resp.content)}')
     except Exception as e:
-        logger.warning(f'云存储下载异常 {e}')
-        return False
+        logger.warning(f'fallback 下载异常 {e}')
+
+    logger.info('从云存储恢复失败，将使用空数据库')
+    return False

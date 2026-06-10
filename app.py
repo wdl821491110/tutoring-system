@@ -1,4 +1,4 @@
-"""
+﻿"""
 
 课消管理系统 v3.0 - 主程序
 
@@ -26,17 +26,14 @@ import threading
 
 import time
 
-import webbrowser
 
 import requests  # PyInstaller 需要顶层导入才能自动打包
 
-import jwt  # JWT token 签名验证（本地和 Render 共用密钥，互相认可）
+import jwt  # JWT token 签名验证（本地和云端共用密钥，互相认可）
 
 # 代理预热共享状态（避免多个请求并发预热阻塞线程池）
-_proxy_warm_lock = threading.Lock()
-_proxy_warm_done = False
 
-# JWT 签名密钥（本地和 Render 必须一致，否则 token 互不认可）
+# JWT 签名密钥（本地和云端必须一致，否则 token 互不认可）
 JWT_SECRET = os.environ.get("JWT_SECRET") or "tutoring-system-v3-secret-key-2026"
 
 from functools import wraps
@@ -75,8 +72,6 @@ logging.basicConfig(filename=ERROR_LOG, level=logging.ERROR,
 
 from database import get_db, init_db, get_data_dir, DB_PATH
 
-# Token 使用 JWT 签名（不再使用内存字典存储）
-# 本地和 Render 共享相同 JWT_SECRET，本地签发的 token Render 也能验证
 
 # ==================== 统一响应 ====================
 
@@ -96,148 +91,27 @@ def api_error(message, code=400, http_status=400):
 
 # ==================== 运行模式检测 ====================
 
-CLOUDBASE_API = 'https://tutoring-system-qqrf.onrender.com'
 
-# 代理开关：True=业务数据走Render代理（需Render已部署JWT代码）
-# 小程序和电脑端数据互通必须开启
-USE_PROXY = os.environ.get("USE_PROXY", "true").lower() not in ("false", "0", "no", "")
 
 IS_CLOUD = bool(os.environ.get('PORT') or os.environ.get('KUBERNETES_SERVICE_HOST') or os.path.exists('/.dockerenv'))
 
 # ==================== CORS ====================
 
-@app.before_request
 
 def handle_local_proxy_or_cors():
-
-    """本地模式：/api/* 请求代理到 CloudBase；CORS 预检放行"""
-
-    # CORS 预检处理（必须在代理之前）
+    """CORS 预检放行"""
+    # CORS 预检处理
     if request.method == 'OPTIONS' and request.path.startswith('/api/'):
-
         resp = app.make_default_options_response()
-
         resp.headers['Access-Control-Allow-Origin'] = request.headers.get('Origin', '*')
-
         resp.headers['Access-Control-Allow-Methods'] = 'GET,POST,PUT,DELETE,OPTIONS'
-
         resp.headers['Access-Control-Allow-Headers'] = 'Content-Type,Authorization'
-
         resp.headers['Access-Control-Max-Age'] = '3600'
-
         return resp
 
-    # 本地 exe 模式：业务 API 走 Render（数据互通）
-    # 登录/鉴权排除在外：走本地，避免 Render 冷启动阻塞登录
-    # JWT 密钥一致，本地签发的 token 能被 Render 验证
-    _LOCAL_AUTH_PATHS = ('/api/auth/login', '/api/auth/me', '/api/auth/logout')
-    if USE_PROXY and not IS_CLOUD and request.path.startswith('/api/') and request.path not in _LOCAL_AUTH_PATHS:
 
-        return _proxy_to_cloudbase()
 
-def _ensure_warm():
-    """确保 Render 后端已启动，多线程共享预热状态（避免并发阻塞线程池）"""
-    global _proxy_warm_done
-    if _proxy_warm_done:
-        return True
-    with _proxy_warm_lock:
-        if _proxy_warm_done:
-            return True
-        for _ in range(8):
-            try:
-                hr = requests.get(f'{CLOUDBASE_API}/api/health', timeout=5)
-                if hr.status_code == 200 and 'json' in hr.headers.get('Content-Type', ''):
-                    _proxy_warm_done = True
-                    return True
-            except:
-                pass
-            time.sleep(2)
-        return False
 
-def _proxy_to_cloudbase():
-    """将请求转发到 Render 后端，快速尝试+预热重试
-    Cloudflare WAF 拦截任何 header 中的 JWT + 中文 body，因此把 token 放到 URL 参数 ?token=
-    """
-    target_url = CLOUDBASE_API + request.full_path.split('?')[0] if request.full_path.startswith('/api') else CLOUDBASE_API + request.path
-
-    # 从 Authorization header 提取 token，追加到 URL params
-    proxy_token = None
-    for k, v in request.headers:
-        if k.lower() == 'authorization' and v.startswith('Bearer '):
-            proxy_token = v[7:]
-            break
-    fwd_headers = {'Content-Type': 'application/json'}  # 最小 header 集，避免 Cloudflare 误拦截
-
-    body = request.get_data()
-    # 确保 body 是 UTF-8（curl/浏览器可能用 GBK 发送中文）
-    if body:
-        try:
-            body = body.decode('utf-8').encode('utf-8')
-        except UnicodeDecodeError:
-            try:
-                body = body.decode('gbk').encode('utf-8')
-            except Exception:
-                logging.warning(f'GBK body decode failed: {sys.exc_info()[1]}')
-
-    # Cloudflare WAF 拦截所有含 JWT + 中文 body 的请求
-    # 方案：token 放 ?t= 参数，body 做 base64 编码
-    params = {'b64': '1'}
-    if proxy_token:
-        params['t'] = proxy_token
-    # Compatible with new ts+sig param
-    ts_param = request.args.get('ts', '')
-    if ts_param and not proxy_token:
-        proxy_token = ts_param
-        params['t'] = ts_param
-    body_b64 = base64.b64encode(body).decode() if body and proxy_token else None
-    body_to_send = body_b64  # str, 不要 encode 成 bytes
-    if request.method == 'GET':
-        for k, v in request.args.items():
-            if k not in ('t', 'b64', 'token', 'ts', 'sig'):
-                params[k] = v
-    excluded_headers = {'content-encoding', 'content-length', 'transfer-encoding', 'connection'}
-
-    def _do_request(timeout):
-        """发起代理请求，返回 (success, response_or_None)"""
-        try:
-            resp = requests.request(method=request.method, url=target_url,
-                headers=fwd_headers, data=body_to_send,
-                params=params if params else None,
-                timeout=timeout, allow_redirects=False)
-            ct = resp.headers.get('Content-Type', '')
-            if 'json' in ct:
-                return True, resp
-            # 非JSON响应（可能是Render冷启动HTML页面）
-            return False, resp
-        except requests.exceptions.RequestException as e:
-            return False, None
-
-    # 第1次：快速尝试（Render已热时1秒内返回）
-    ok, resp = _do_request(8)
-    if ok:
-        resp_headers = [(k, v) for k, v in resp.raw.headers.items() if k.lower() not in excluded_headers]
-        return Response(resp.content, status=resp.status_code, headers=resp_headers)
-
-    # 非JSON/网络错误 → 预热Render
-    if _proxy_warm_done:
-        # 已预热过但请求还是失败，可能是短暂网络波动，再试一次
-        ok, resp = _do_request(15)
-        if ok:
-            resp_headers = [(k, v) for k, v in resp.raw.headers.items() if k.lower() not in excluded_headers]
-            return Response(resp.content, status=resp.status_code, headers=resp_headers)
-        return api_error('服务器暂时不可用，请稍后重试', 502, 502)
-
-    # 首次预热（共享锁，避免并发）
-    if not _ensure_warm():
-        return api_error('后端服务正在启动中，请10秒后重试', 502, 502)
-
-    # 预热成功，重试请求
-    ok, resp = _do_request(30)
-    if ok:
-        resp_headers = [(k, v) for k, v in resp.raw.headers.items() if k.lower() not in excluded_headers]
-        return Response(resp.content, status=resp.status_code, headers=resp_headers)
-    logging.warning(f'Render 代理不可用，路径: {request.path}。建议检查网络或设置 USE_PROXY=false 使用本地数据库。')
-    return api_error('服务器连接失败，请稍后重试', 502, 502)
 
 
 def add_cors_headers(response):
@@ -335,7 +209,7 @@ def verify_password(stored_hash, password):
 
 def generate_token(user_id, role, username='', linked_student_id=None, linked_teacher_id=None):
 
-    """生成 JWT token（本地和 Render 共享密钥，互相认可）
+    """生成 JWT token（本地和云端共享密钥，互相认可）
     注意：real_name 从 JWT 中移除，避免 Cloudflare WAF 因中文+JWT组合误拦截写请求
     """
     payload = {
@@ -360,7 +234,7 @@ def generate_token(user_id, role, username='', linked_student_id=None, linked_te
 
 def get_current_user():
 
-    """从请求头/URL参数获取当前用户信息（JWT 验证，本地和 Render 互认）
+    """从请求头/URL参数获取当前用户信息（JWT 验证，本地和云端互认）
     token 可通过 Authorization header 或 ?t= URL参数传递
     ?t= 用于绕过 Cloudflare WAF（参数名含 token/auth 会被拦截）
     """

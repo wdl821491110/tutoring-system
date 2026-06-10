@@ -1,4 +1,4 @@
-"""
+﻿"""
 课消管理系统 - 程序入口
 支持本地 Windows 和 CloudBase CloudRun 部署
 CloudRun 部署时自动使用云存储备份恢复数据库
@@ -50,7 +50,6 @@ def restore_from_cloud():
         success = download_db(db_path)
         if success:
             logger.info('数据库从云存储恢复成功')
-            # 重新初始化（确保表结构存在）
             init_db()
         else:
             logger.info('云端无备份或恢复失败，使用本地/新建数据库')
@@ -85,14 +84,11 @@ def cloud_backup_loop(interval=300):
 
 
 def main():
-    # 如果在云环境中，先尝试恢复数据库
     if _should_use_cloud():
         restore_from_cloud()
 
-    # 初始化数据库（如果数据库已存在则不会覆盖）
     init_db()
 
-    # 检测运行环境
     is_docker = os.path.exists('/.dockerenv') or os.environ.get('KUBERNETES_SERVICE_HOST')
     cloud_port = os.environ.get('PORT', '')
 
@@ -107,38 +103,24 @@ def main():
         host = '127.0.0.1'
 
     print(f"课消管理系统 v3.1 启动: {host}:{port}")
-    # 显示代理模式状态
-    from app import USE_PROXY as _use_proxy, IS_CLOUD as _is_cloud
+    from app import IS_CLOUD as _is_cloud
     if _is_cloud:
         print("运行模式: 云端 CloudRun（直接读写本地 SQLite + 云备份）")
-    elif _use_proxy:
-        print("运行模式: 本地 exe + 代理到 Render 云端（三端数据互通）")
-        print("提示: 如需本地独立运行不依赖 Render，设置环境变量 USE_PROXY=false")
     else:
         print("运行模式: 本地 exe（直接读写本地 SQLite，独立运行）")
     print(f"数据目录: {get_data_dir()}")
     if _should_use_cloud():
         print("云备份: 已启用（自动备份到CloudBase云存储）")
 
-    # 启动定期云备份（仅 CloudRun 环境）
     if _should_use_cloud():
         t = threading.Thread(target=cloud_backup_loop, args=(300,), daemon=True)
         t.start()
 
     # 仅本地模式自动打开浏览器
     if not cloud_port and not is_docker:
-        # 后台预热 Render + 打开浏览器
-        def _warm_and_open():
-            time.sleep(0.5)
-            import webbrowser
-            webbrowser.open(f'http://127.0.0.1:{port}')
-            # 调用 app 的预热函数（设置共享状态 _proxy_warm_done）
-            try:
-                from app import _ensure_warm
-                _ensure_warm()
-            except Exception:
-                pass
-        threading.Thread(target=_warm_and_open, daemon=True).start()
+        time.sleep(1)
+        import webbrowser
+        webbrowser.open(f'http://127.0.0.1:{port}')
 
     # 启动服务
     serve(app, host=host, port=port)

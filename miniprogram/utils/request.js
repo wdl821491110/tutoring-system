@@ -1,8 +1,8 @@
-/**
+﻿/**
  * 统一网络请求封装
  * 提供 auth 注入、401 自动重登、错误兜底
  */
-const BASE_URL = 'https://tutoring-system-qqrf.onrender.com';
+const BASE_URL = 'https://tutoring-268460-4-1441821069.sh.run.tcloudbase.com';
 const MAX_RETRIES = 1;
 
 const getToken = () => wx.getStorageSync('token') || '';
@@ -96,3 +96,5 @@ const request = (url, options = {}) => {
 };
 
 module.exports = { request, BASE_URL, clearAuth, redirectToLogin };
+
+

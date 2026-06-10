@@ -1,9 +1,36 @@
 {
-  "envId": "wdl1110-d1g8w3lcf657b61fd",
+  "envId": "touring-d1g3bubk681ee89e9",
   "version": "2.0",
   "framework": {
     "name": "flask",
     "plugins": {
+      "http": {
+        "use": "@cloudbase/framework-plugin-http",
+        "inputs": {
+          "services": [
+            {
+              "path": "/api/",
+              "charset": "utf8",
+              "domain": "*",
+              "debug": {
+                "enable": true
+              },
+              "strategy": "openapi",
+              "envVariables": {}
+            },
+            {
+              "path": "/",
+              "charset": "utf8",
+              "domain": "*",
+              "debug": {
+                "enable": true
+              },
+              "strategy": "openapi",
+              "envVariables": {}
+            }
+          ]
+        }
+      },
       "container": {
         "use": "@cloudbase/framework-plugin-container",
         "inputs": {
@@ -20,5 +47,11 @@
   },
   "cloudrun": {
     "name": "tutoring-system"
+  },
+  "app": {
+    "serviceName": "tutoring-system",
+    "installCommand": "",
+    "buildCommand": "",
+    "outputDir": "./"
   }
 }
