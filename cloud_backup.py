@@ -10,12 +10,9 @@ CLOUD_BACKUP_PATH = 'backup/tutoring.db'
 
 
 def _get_api_key():
-    # 优先使用环境变量（CloudRun 部署时覆盖）
+    # 从环境变量读取（CloudRun 部署时必须通过 --env 传入）
     key = os.environ.get('TCB_API_KEY', '').strip()
-    if key:
-        return key
-    # 本地 exe 使用硬编码默认密钥
-    return 'eyJhbGciOiJSUzI1NiIsImtpZCI6IjlkMWRjMzFlLWI0ZDAtNDQ4Yi1hNzZmLWIwY2M2M2Q4MTQ5OCJ9.eyJhdWQiOiJ0b3VyaW5nLWQxZzNidWJrNjgxZWU4OWU5IiwiZXhwIjoyNTM0MDIzMDA3OTksImlhdCI6MTc4MTA1MTk5MywiYXRfaGFzaCI6IndaaFltZ2tDU2FlUmNSWUpNQ2E0SlEiLCJwcm9qZWN0X2lkIjoidG91cmluZy1kMWczYnViazY4MWVlODllOSIsIm1ldGEiOnsicGxhdGZvcm0iOiJBcGlLZXkifSwiYWRtaW5pc3RyYXRvcl9pZCI6IjIwNjQ0OTg3NjM1MDkwNTU0OTAiLCJ1c2VyX3R5cGUiOiIiLCJjbGllbnRfdHlwZSI6ImNsaWVudF9zZXJ2ZXIiLCJpc19zeXN0ZW1fYWRtaW4iOnRydWV9.Xuvq33PaS2Y9y_yf3T0FOZsQS7BJk7ng74fvD92a_Z6CvdX-mE5xZFkAI4AF9H4T77HVIs9CbhK47vdbdGG_gJV4rLN1CH7jMEUEIhNKtciZHQY0gmdjFQHjlx8J7Nuv1ls5XOQxxmC7b2GZGDB4AfIScp2K6mSQw-YoBltbaYByaIuSbYz5lkzymnPnFnsRp3qyBwODFRxc7rDzq7h_IEgFUAy23beYsgKtx335QgjPyknXY7pWjuzseuiFU9ekCQyNxLjWTxPmCw8E-9spB0oMQRgk6es900Y93LWd3dPzeVAN-Zv728skRJOJMt4j6APtnoITw2sL_PQslFE2VA'
+    return key  # 云端无 Key 时返回空字符串，由调用方处理
 
 
 def upload_db(db_path):
