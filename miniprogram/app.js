@@ -8,6 +8,13 @@ App({
   },
 
   onLaunch() {
+    // 0. 初始化云环境（wx.cloud.callContainer 必须）
+    if (wx.cloud) {
+      wx.cloud.init({ env: 'tutoring-d1g8s1kwf3a000614' });
+    } else {
+      wx.showToast({ title: '微信版本过低，请升级', icon: 'none' });
+    }
+
     // 1. 恢复登录态
     restoreSession();
 

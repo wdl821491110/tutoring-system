@@ -27,6 +27,7 @@
       { "pagePath": "pages/profile/profile", "text": "我的", "iconPath": "images/tab-me.png", "selectedIconPath": "images/tab-me-a.png" }
     ]
   },
+  "cloud": true,
   "style": "v2",
   "sitemapLocation": "sitemap.json",
   "useExtendedLib": {

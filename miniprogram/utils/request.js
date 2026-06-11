@@ -1,9 +1,14 @@
-﻿/**
- * 统一网络请求封装
+/**
+ * 统一网络请求封装 — 使用 wx.cloud.callContainer 走微信内网通道
  * 提供 auth 注入、401 自动重登、错误兜底
+ *
+ * 与原 wx.request 版本的区别：
+ *   - 不再需要 BASE_URL（走微信内网，不经过公网）
+ *   - 不再需要 sig/ts/b64 的 Cloudflare WAF 绕过逻辑
+ *   - 直接使用 Authorization header 传递 JWT token
  */
-const BASE_URL = 'https://tutoring-268460-4-1441821069.sh.run.tcloudbase.com';
-const MAX_RETRIES = 1;
+const SERVICE_NAME = 'tutoring';   // CloudBase 云托管服务名
+const ENV_ID = 'tutoring-d1g8s1kwf3a000614';
 
 const getToken = () => wx.getStorageSync('token') || '';
 
@@ -21,64 +26,41 @@ const redirectToLogin = () => {
   wx.reLaunch({ url: '/pages/login/login' });
 };
 
-// 简易 base64 编码（微信小程序无 btoa）
-const _btoa = (str) => {
-  const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/';
-  let result = '';
-  const bytes = [];
-  for (let i = 0; i < str.length; i++) {
-    const code = str.charCodeAt(i);
-    if (code < 0x80) { bytes.push(code); }
-    else if (code < 0x800) { bytes.push(0xc0 | (code >> 6), 0x80 | (code & 0x3f)); }
-    else { bytes.push(0xe0 | (code >> 12), 0x80 | ((code >> 6) & 0x3f), 0x80 | (code & 0x3f)); }
-  }
-  for (let i = 0; i < bytes.length; i += 3) {
-    const b1 = bytes[i], b2 = bytes[i + 1] || 0, b3 = bytes[i + 2] || 0;
-    result += chars[b1 >> 2];
-    result += chars[((b1 & 3) << 4) | (b2 >> 4)];
-    result += i + 1 < bytes.length ? chars[((b2 & 15) << 2) | (b3 >> 6)] : '=';
-    result += i + 2 < bytes.length ? chars[b3 & 63] : '=';
-  }
-  return result;
-};
-
+/**
+ * 统一请求函数
+ * @param {string} url  - 路径，如 '/api/students'
+ * @param {object} options - { method, body, header }
+ * @returns {Promise<object>} 解析为后端返回的 JSON body（{ code, data, message }）
+ */
 const request = (url, options = {}) => {
   const token = getToken();
   const method = options.method || 'GET';
-  const isWrite = method === 'POST' || method === 'PUT' || method === 'DELETE';
-
-  // 绕过 Cloudflare WAF：token 放 ?t=，POST/PUT body 做 base64 编码
-  // Token 暴露加固：使用时间戳 + 摘要签名防止重放，参数名随机化
-  const paramTime = Date.now();
-  const paramSig = _btoa(token + ':' + paramTime).substring(0, 16);
-  let fullUrl = token
-    ? `${BASE_URL}${url}${url.includes('?') ? '&' : '?'}ts=${paramTime}&sig=${encodeURIComponent(paramSig)}`
-    : `${BASE_URL}${url}`;
-  if (token && isWrite && options.body) {
-    fullUrl += '&b64=1';
-  }
 
   const headers = {
     'Content-Type': 'application/json',
+    'X-WX-SERVICE': SERVICE_NAME,
     ...(options.header || {})
   };
+  if (token) {
+    headers['Authorization'] = `Bearer ${token}`;
+  }
 
-  // Base64 encode POST/PUT body (绕过 Cloudflare 中文检测)
-  let bodyData = options.body;
-  if (isWrite && options.body && token) {
-    const raw = typeof options.body === 'string' ? options.body : JSON.stringify(options.body);
-    // 微信小程序没有 btoa，手动 base64
-    bodyData = _btoa(raw);
+  // wx.cloud 可用性检查
+  if (!wx.cloud || !wx.cloud.callContainer) {
+    wx.showToast({ title: '微信版本过低，请升级', icon: 'none' });
+    return Promise.reject(new Error('wx.cloud.callContainer not available'));
   }
 
   return new Promise((resolve, reject) => {
-    wx.request({
-      url: fullUrl,
+    wx.cloud.callContainer({
+      config: { env: ENV_ID },
+      path: url,
       method: method,
-      data: bodyData,
       header: headers,
+      data: method !== 'GET' ? (options.body || {}) : {},
       success: (r) => {
-        // 401 跳登录
+        // r.data = 响应体 { code, data, message }
+        // r.statusCode = HTTP 状态码
         if (r.data && r.data.code === 401) {
           clearAuth();
           redirectToLogin();
@@ -95,6 +77,4 @@ const request = (url, options = {}) => {
   });
 };
 
-module.exports = { request, BASE_URL, clearAuth, redirectToLogin };
-
-
+module.exports = { request, clearAuth, redirectToLogin };

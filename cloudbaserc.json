@@ -1,5 +1,5 @@
 {
-  "envId": "touring-d1g3bubk681ee89e9",
+  "envId": "tutoring-d1g8s1kwf3a000614",
   "version": "2.0",
   "framework": {
     "name": "flask",
@@ -34,7 +34,7 @@
       "container": {
         "use": "@cloudbase/framework-plugin-container",
         "inputs": {
-          "serviceName": "tutoring-system",
+          "serviceName": "tutoring",
           "servicePath": "/",
           "containerPort": 80,
           "dockerfilePath": "Dockerfile",
@@ -46,10 +46,10 @@
     }
   },
   "cloudrun": {
-    "name": "tutoring-system"
+    "name": "tutoring"
   },
   "app": {
-    "serviceName": "tutoring-system",
+    "serviceName": "tutoring",
     "installCommand": "",
     "buildCommand": "",
     "outputDir": "./"

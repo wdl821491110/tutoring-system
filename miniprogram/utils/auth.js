@@ -1,7 +1,7 @@
 /**
  * 认证与角色管理
  */
-const { request, BASE_URL } = require('./request');
+const { request } = require('./request');
 
 const STORAGE_KEY_TOKEN = 'token';
 const STORAGE_KEY_USER = 'user';

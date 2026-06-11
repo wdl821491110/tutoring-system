@@ -4,7 +4,7 @@ import logging
 
 logger = logging.getLogger(__name__)
 
-ENV_ID = os.environ.get('TCB_ENV_ID', 'touring-d1g3bubk681ee89e9')
+ENV_ID = os.environ.get('TCB_ENV_ID', 'tutoring-d1g8s1kwf3a000614')
 GATEWAY = f'https://{ENV_ID}.api.tcloudbasegateway.com'
 CLOUD_BACKUP_PATH = 'backup/tutoring.db'
 
