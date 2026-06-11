@@ -638,84 +638,52 @@ def dashboard():
     today = date.today().isoformat()
 
     # 权限过滤
-
     student_filter = ""
-
     teacher_filter = ""
-
-    params = []
+    teacher_params = []
+    student_params = []
 
     if user and user['role'] == 'teacher' and user.get('linked_teacher_id'):
-
         teacher_filter = " AND (s.teacher_id = ? OR cr.teacher_id = ?)"
-
-        params = [user['linked_teacher_id'], user['linked_teacher_id']]
-
+        teacher_params = [user['linked_teacher_id'], user['linked_teacher_id']]
     elif user and user['role'] == 'parent' and user.get('linked_student_id'):
-
         student_filter = " AND e.student_id = ?"
-
-        params = [user['linked_student_id']]
+        student_params = [user['linked_student_id']]
 
     total_students = db.execute(f"SELECT COUNT(*) as c FROM students WHERE status='active'{student_filter}",
-
-                                params).fetchone()['c']
-
+                                student_params).fetchone()['c']
     total_teachers = db.execute("SELECT COUNT(*) as c FROM teachers WHERE status='active'").fetchone()['c']
-
     total_courses = db.execute("SELECT COUNT(*) as c FROM courses WHERE status='active'").fetchone()['c']
 
     today_schedules = db.execute(f"""
-
         SELECT s.*, st.name as student_name, c.name as course_name, c.subject, t.name as teacher_name
-
         FROM schedules s
-
         JOIN students st ON s.student_id = st.id
-
         JOIN courses c ON s.course_id = c.id
-
         LEFT JOIN teachers t ON s.teacher_id = t.id
-
         WHERE s.schedule_date = ?{teacher_filter}
-
         ORDER BY s.start_time
-
-    """, [today] + params).fetchall()
+    """, [today] + teacher_params).fetchall()
 
     today_consumed = db.execute(f"""
-
         SELECT COALESCE(SUM(hours_consumed), 0) as total
-
         FROM class_records cr WHERE record_date = ?{teacher_filter}
-
-    """, [today] + params).fetchone()['total']
+    """, [today] + teacher_params).fetchone()['total']
 
     total_remaining = db.execute(f"""
-
         SELECT COALESCE(SUM(remaining_hours), 0) as total
-
         FROM enrollments e WHERE status = 'active'{student_filter}
-
-    """, params).fetchone()['total']
+    """, student_params).fetchone()['total']
 
     daily_stats = db.execute(f"""
-
         WITH RECURSIVE dates(d) AS (
-
             SELECT date('now', '-6 days', 'localtime')
-
             UNION ALL SELECT date(d, '+1 day') FROM dates WHERE d < date('now', 'localtime')
-
         )
-
         SELECT dates.d as record_date, COALESCE(SUM(cr.hours_consumed), 0) as total
-
         FROM dates LEFT JOIN class_records cr ON cr.record_date = dates.d{teacher_filter}
-
         GROUP BY dates.d ORDER BY dates.d
-
-    """, params).fetchall()
+    """, teacher_params).fetchall()
 
     course_ranking = db.execute(f"""
 
