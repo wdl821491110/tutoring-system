@@ -73,8 +73,8 @@ def backup_to_cloud():
         logger.warning(f'备份到云存储失败: {e}')
 
 
-def cloud_backup_loop(interval=300):
-    """定期备份循环（默认5分钟）"""
+def cloud_backup_loop(interval=3600):
+    """定期备份循环（默认1小时）"""
     while True:
         time.sleep(interval)
         try:

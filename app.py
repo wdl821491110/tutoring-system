@@ -122,14 +122,6 @@ def add_cors_headers(response):
 
     response.headers['Access-Control-Allow-Methods'] = 'GET,POST,PUT,DELETE,OPTIONS'
 
-    # 写操作后触发云端备份（仅CloudRun环境）
-
-    if request.method in ('POST', 'PUT', 'DELETE') and response.status_code < 400:
-
-        if os.environ.get('TCB_API_KEY'):
-
-            trigger_cloud_backup()
-
     return response
 
 # 注册 after_request：确保写操作后触发云备份，CORS 头正确设置
