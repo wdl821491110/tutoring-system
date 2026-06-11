@@ -113,7 +113,7 @@ def main():
         print("云备份: 已启用（自动备份到CloudBase云存储）")
 
     if _should_use_cloud():
-        t = threading.Thread(target=cloud_backup_loop, args=(300,), daemon=True)
+        t = threading.Thread(target=cloud_backup_loop, args=(3600,), daemon=True)
         t.start()
 
     # CloudBase 冷启动预热：先请求 /api/health 唤醒容器
