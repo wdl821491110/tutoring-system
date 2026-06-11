@@ -283,6 +283,17 @@ def init_db():
     except Exception:
         pass
 
+    # 确保 class_records.teacher_id 列存在（数据库升级兼容）
+    try:
+        cursor.execute("PRAGMA table_info(class_records)")
+        columns = [row['name'] if isinstance(row, dict) else row[1] for row in cursor.fetchall()]
+        if 'teacher_id' not in columns:
+            cursor.execute("ALTER TABLE class_records ADD COLUMN teacher_id INTEGER")
+            conn.commit()
+            print("已添加 teacher_id 列到 class_records 表")
+    except Exception:
+        pass
+
     conn.close()
     print(f"数据库就绪: {DB_PATH}")
 
