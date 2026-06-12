@@ -95,6 +95,19 @@ def init_db():
             UNIQUE(course_id, teacher_id)
         );
 
+        -- 学生-教师关联表（支持多对多）
+        CREATE TABLE IF NOT EXISTS student_teachers (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            student_id INTEGER NOT NULL,
+            teacher_id INTEGER NOT NULL,
+            created_at TIMESTAMP DEFAULT (datetime('now', 'localtime')),
+            FOREIGN KEY (student_id) REFERENCES students(id) ON DELETE CASCADE,
+            FOREIGN KEY (teacher_id) REFERENCES teachers(id) ON DELETE CASCADE,
+            UNIQUE(student_id, teacher_id)
+        );
+        CREATE INDEX IF NOT EXISTS idx_student_teachers_student ON student_teachers(student_id);
+        CREATE INDEX IF NOT EXISTS idx_student_teachers_teacher ON student_teachers(teacher_id);
+
         -- 用户表（登录鉴权）
         CREATE TABLE IF NOT EXISTS users (
             id INTEGER PRIMARY KEY AUTOINCREMENT,

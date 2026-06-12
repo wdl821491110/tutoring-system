@@ -276,11 +276,12 @@ async function loadStudents() {
         STATE.students = apiData(await api(`/api/students?search=${encodeURIComponent(s)}`));
         const tbody = $('#studentTable');
         if (!tbody) return;
-        if (STATE.students.length === 0) { tbody.innerHTML = '<tr><td colspan="9"><div class="empty-state"><div class="empty-text">暂无数据</div></div></td></tr>'; return; }
+        if (STATE.students.length === 0) { tbody.innerHTML = '<tr><td colspan="10"><div class="empty-state"><div class="empty-text">暂无数据</div></div></td></tr>'; return; }
         tbody.innerHTML = STATE.students.map(s => {
             const cn = (s.enrollments||[]).map(e=>e.course_name).join('、')||'-';
             const r = s.total_remaining??0;
-            return `<tr><td class="font-bold">${s.name}</td><td>${s.gender||'-'}</td><td>${s.grade||'-'}</td><td>${s.school||'-'}</td><td>${s.parent_name||'-'}</td><td>${s.parent_phone||'-'}</td><td>${cn}</td><td class="font-bold ${r<=2?'text-danger':'text-success'}">${r}</td><td>${isAdmin()?`<button class="btn btn-outline btn-xs" onclick="viewStudent(${s.id})">详情</button> <button class="btn btn-outline btn-xs" onclick="showStudentModal(${s.id})">编辑</button> <button class="btn btn-danger btn-xs" onclick="deleteStudent(${s.id})">停用</button>`:`<button class="btn btn-outline btn-xs" onclick="viewStudent(${s.id})">详情</button>`}</td></tr>`;
+            const tn = s.teacher_names||'-';
+            return `<tr><td class="font-bold">${s.name}</td><td>${s.gender||'-'}</td><td>${s.grade||'-'}</td><td>${s.school||'-'}</td><td>${tn}</td><td>${s.parent_name||'-'}</td><td>${s.parent_phone||'-'}</td><td>${cn}</td><td class="font-bold ${r<=2?'text-danger':'text-success'}">${r}</td><td>${isAdmin()?`<button class="btn btn-outline btn-xs" onclick="viewStudent(${s.id})">详情</button> <button class="btn btn-outline btn-xs" onclick="showStudentModal(${s.id})">编辑</button> <button class="btn btn-danger btn-xs" onclick="deleteStudent(${s.id})">停用</button>`:`<button class="btn btn-outline btn-xs" onclick="viewStudent(${s.id})">详情</button>`}</td></tr>`;
         }).join('');
     } catch(e) {
         console.error('loadStudents error:', e);
@@ -300,25 +301,34 @@ async function viewStudent(sid) {
             <div class="detail-item"><div class="detail-label">学校</div><div class="detail-value">${s.school||'-'}</div></div>
             <div class="detail-item"><div class="detail-label">家长</div><div class="detail-value">${s.parent_name||'-'}</div></div>
             <div class="detail-item"><div class="detail-label">电话</div><div class="detail-value">${s.parent_phone||'-'}</div></div>
+            <div class="detail-item"><div class="detail-label">关联教师</div><div class="detail-value">${s.teacher_names||'未关联'}</div></div>
         </div>
         <h4 style="margin:16px 0 8px;">📝 报名课程</h4><table><thead><tr><th>课程</th><th>科目</th><th>购买</th><th>已消</th><th>剩余</th></tr></thead><tbody>${eh}</tbody></table>
         <h4 style="margin:16px 0 8px;">📋 近期消课</h4><table><thead><tr><th>日期</th><th>课程</th><th>教师</th><th>消耗</th><th>剩余</th><th>出勤</th></tr></thead><tbody>${rh}</tbody></table>
     `, '', 'modal-lg');
 }
 
-function showStudentModal(id = null) {
+async function showStudentModal(id = null) {
     STATE.editingId = id; const s = id ? STATE.students.find(st=>st.id===id) : null;
+    // 确保教师列表已加载
+    if (!STATE.teachers || STATE.teachers.length === 0) {
+        try { STATE.teachers = apiData(await api('/api/teachers')); } catch(e) { STATE.teachers = []; }
+    }
+    const existingTids = s?.teacher_ids || [];
+    const teacherCheckboxes = STATE.teachers.map(t => `<label style="display:inline-flex;align-items:center;margin-right:16px;cursor:pointer;"><input type="checkbox" class="fTeacherCb" value="${t.id}" ${existingTids.includes(t.id)?'checked':''} style="margin-right:4px;">${t.name}</label>`).join('');
     showModal(id?'编辑学生':'添加学生', `
         <div class="form-row"><div class="form-group"><label>姓名*</label><input type="text" class="form-input" id="fName" value="${s?.name||''}"></div><div class="form-group"><label>性别</label><select class="form-select" id="fGender"><option value="男" ${s?.gender==='男'?'selected':''}>男</option><option value="女" ${s?.gender==='女'?'selected':''}>女</option></select></div></div>
         <div class="form-row"><div class="form-group"><label>年级</label><input type="text" class="form-input" id="fGrade" value="${s?.grade||''}"></div><div class="form-group"><label>学校</label><input type="text" class="form-input" id="fSchool" value="${s?.school||''}"></div></div>
         <div class="form-row"><div class="form-group"><label>家长姓名</label><input type="text" class="form-input" id="fParentName" value="${s?.parent_name||''}"></div><div class="form-group"><label>家长电话</label><input type="text" class="form-input" id="fParentPhone" value="${s?.parent_phone||''}"></div></div>
         <div class="form-group"><label>地址</label><input type="text" class="form-input" id="fAddress" value="${s?.address||''}"></div>
+        <div class="form-group"><label>关联教师</label><div style="padding:8px 0;">${teacherCheckboxes || '<span class="text-muted">暂无教师，请先添加教师</span>'}</div></div>
         <div class="form-group"><label>备注</label><textarea class="form-textarea" id="fNotes" rows="2">${s?.notes||''}</textarea></div>
     `, `<button class="btn btn-outline" onclick="closeModal()">取消</button><button class="btn btn-primary" onclick="saveStudent()">保存</button>`);
 }
 
 async function saveStudent() {
-    const d = { name: $('#fName').value.trim(), gender: $('#fGender').value, grade: $('#fGrade').value.trim(), school: $('#fSchool').value.trim(), parent_name: $('#fParentName').value.trim(), parent_phone: $('#fParentPhone').value.trim(), address: $('#fAddress').value.trim(), notes: $('#fNotes').value.trim() };
+    const tids = [...document.querySelectorAll('.fTeacherCb:checked')].map(cb => parseInt(cb.value));
+    const d = { name: $('#fName').value.trim(), gender: $('#fGender').value, grade: $('#fGrade').value.trim(), school: $('#fSchool').value.trim(), parent_name: $('#fParentName').value.trim(), parent_phone: $('#fParentPhone').value.trim(), address: $('#fAddress').value.trim(), notes: $('#fNotes').value.trim(), teacher_ids: tids };
     if (!d.name) { toast('请输入姓名', 'error'); return; }
     const res = await api(STATE.editingId?`/api/students/${STATE.editingId}`:'/api/students', { method: STATE.editingId?'PUT':'POST', body: JSON.stringify(d) });
     toast(res.message||'成功','success'); closeModal(); loadStudents();

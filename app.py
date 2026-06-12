@@ -358,6 +358,22 @@ def teacher_course_ids(db, teacher_id):
 
     return [r['id'] for r in rows]
 
+def teacher_student_ids(db, teacher_id):
+
+    """获取教师关联的学生ID列表（多对多关联）"""
+
+    rows = db.execute("SELECT student_id FROM student_teachers WHERE teacher_id = ?", (teacher_id,)).fetchall()
+
+    return [r['student_id'] for r in rows]
+
+def student_teacher_ids(db, student_id):
+
+    """获取学生关联的教师ID列表"""
+
+    rows = db.execute("SELECT teacher_id FROM student_teachers WHERE student_id = ?", (student_id,)).fetchall()
+
+    return [r['teacher_id'] for r in rows]
+
 def require_auth(roles=None):
 
     """鉴权装饰器，roles为允许的角色列表"""
@@ -644,8 +660,19 @@ def dashboard():
     student_params = []
 
     if user and user['role'] == 'teacher' and user.get('linked_teacher_id'):
-        teacher_filter = " AND (s.teacher_id = ? OR cr.teacher_id = ?)"
-        teacher_params = [user['linked_teacher_id'], user['linked_teacher_id']]
+        sids = teacher_student_ids(db, user['linked_teacher_id'])
+        if sids:
+            placeholders = ','.join('?' * len(sids))
+            teacher_filter = f" AND st.id IN ({placeholders})"
+            teacher_params = sids
+        else:
+            # 无关联学生 → 返回空数据
+            return api_response(data={
+                'total_students': 0, 'total_teachers': db.execute("SELECT COUNT(*) as c FROM teachers WHERE status='active'").fetchone()['c'],
+                'total_courses': db.execute("SELECT COUNT(*) as c FROM courses WHERE status='active'").fetchone()['c'],
+                'today_count': 0, 'today_consumed': 0, 'total_remaining': 0,
+                'today_schedules': [], 'daily_stats': [], 'course_ranking': []
+            })
     elif user and user['role'] == 'parent' and user.get('linked_student_id'):
         student_filter = " AND e.student_id = ?"
         student_params = [user['linked_student_id']]
@@ -667,7 +694,7 @@ def dashboard():
 
     today_consumed = db.execute(f"""
         SELECT COALESCE(SUM(hours_consumed), 0) as total
-        FROM class_records cr WHERE record_date = ?{teacher_filter}
+        FROM class_records cr JOIN students st ON cr.student_id = st.id WHERE cr.record_date = ?{teacher_filter}
     """, [today] + teacher_params).fetchone()['total']
 
     total_remaining = db.execute(f"""
@@ -681,22 +708,17 @@ def dashboard():
             UNION ALL SELECT date(d, '+1 day') FROM dates WHERE d < date('now', 'localtime')
         )
         SELECT dates.d as record_date, COALESCE(SUM(cr.hours_consumed), 0) as total
-        FROM dates LEFT JOIN class_records cr ON cr.record_date = dates.d{teacher_filter}
+        FROM dates LEFT JOIN class_records cr ON cr.record_date = dates.d{' JOIN students st ON cr.student_id = st.id' if teacher_filter else ''}{teacher_filter}
         GROUP BY dates.d ORDER BY dates.d
     """, teacher_params).fetchall()
 
     course_ranking = db.execute(f"""
-
         SELECT c.name, c.subject, COALESCE(SUM(cr.hours_consumed), 0) as total_hours
-
         FROM courses c
-
         LEFT JOIN class_records cr ON c.id = cr.course_id
-
             AND cr.record_date >= date('now', '-30 days', 'localtime')
-
-        WHERE c.status = 'active' GROUP BY c.id ORDER BY total_hours DESC LIMIT 10
-
+            {'JOIN students st ON cr.student_id = st.id' if teacher_filter else ''}
+        WHERE c.status = 'active'{teacher_filter.replace('st.id','cr.student_id') if teacher_filter else ''} GROUP BY c.id ORDER BY total_hours DESC LIMIT 10
     """).fetchall()
 
     return api_response(data={
@@ -741,6 +763,17 @@ def sync_course_teachers(db, course_id, teacher_ids):
 
     db.execute("UPDATE courses SET teacher_id = ? WHERE id = ?", (first, course_id))
 
+def sync_student_teachers(db, student_id, teacher_ids):
+
+    """同步学生-教师关联：先删后插"""
+    db.execute("DELETE FROM student_teachers WHERE student_id = ?", (student_id,))
+
+    for tid in (teacher_ids or []):
+
+        if tid:
+
+            db.execute("INSERT OR IGNORE INTO student_teachers (student_id, teacher_id) VALUES (?, ?)", (student_id, int(tid)))
+
 # ==================== 学生管理 ====================
 
 @app.route('/api/students', methods=['GET'])
@@ -760,6 +793,36 @@ def get_students():
         students = db.execute("SELECT * FROM students WHERE id=? AND status='active'",
 
                               (user['linked_student_id'],)).fetchall()
+
+    elif user and user['role'] == 'teacher' and user.get('linked_teacher_id'):
+
+        sids = teacher_student_ids(db, user['linked_teacher_id'])
+
+        if not sids:
+
+            students = []
+
+        elif search:
+
+            placeholders = ','.join('?' * len(sids))
+
+            students = db.execute(f"""
+
+                SELECT * FROM students
+
+                WHERE id IN ({placeholders}) AND status = ? AND (name LIKE ? OR school LIKE ? OR parent_phone LIKE ?)
+
+                ORDER BY updated_at DESC
+
+            """, sids + [status, f'%{search}%', f'%{search}%', f'%{search}%']).fetchall()
+
+        else:
+
+            placeholders = ','.join('?' * len(sids))
+
+            students = db.execute(f"SELECT * FROM students WHERE id IN ({placeholders}) AND status = ? ORDER BY updated_at DESC",
+
+                                  sids + [status]).fetchall()
 
     elif search:
 
@@ -796,6 +859,13 @@ def get_students():
         row['enrollments'] = [dict(e) for e in enrollments]
 
         row['total_remaining'] = sum(e['remaining_hours'] for e in enrollments)
+
+        # 返回关联教师信息
+        row['teacher_ids'] = student_teacher_ids(db, s['id'])
+        teacher_names = db.execute("""
+            SELECT t.name FROM student_teachers st JOIN teachers t ON st.teacher_id = t.id WHERE st.student_id = ?
+        """, (s['id'],)).fetchall()
+        row['teacher_names'] = ', '.join(t['name'] for t in teacher_names) if teacher_names else ''
 
         result.append(row)
 
@@ -835,6 +905,12 @@ def get_student(sid):
 
     """, (sid,)).fetchall()]
 
+    row['teacher_ids'] = student_teacher_ids(db, sid)
+    teacher_names = db.execute("""
+        SELECT t.name FROM student_teachers st JOIN teachers t ON st.teacher_id = t.id WHERE st.student_id = ?
+    """, (sid,)).fetchall()
+    row['teacher_names'] = ', '.join(t['name'] for t in teacher_names) if teacher_names else ''
+
     return api_response(data=row)
 
 @app.route('/api/students', methods=['POST'])
@@ -857,9 +933,13 @@ def create_student():
 
                          data.get('parent_name', ''), data.get('parent_phone', ''), data.get('address', ''), data.get('notes', '')))
 
+    sid = cursor.lastrowid
+    # 关联教师
+    sync_student_teachers(db, sid, data.get('teacher_ids', []))
+
     db.commit()
 
-    return api_response(data={'id': cursor.lastrowid}, message='添加成功')
+    return api_response(data={'id': sid}, message='添加成功')
 
 @app.route('/api/students/<int:sid>', methods=['PUT'])
 
@@ -884,6 +964,9 @@ def update_student(sid):
                 data.get('parent_phone', s['parent_phone']), data.get('address', s['address']),
 
                 data.get('notes', s['notes']), sid))
+
+    # 关联教师
+    sync_student_teachers(db, sid, data.get('teacher_ids', []))
 
     db.commit()
 
@@ -1156,13 +1239,12 @@ def get_enrollments():
 
         elif user and user['role'] == 'teacher' and user.get('linked_teacher_id'):
 
-            # 教师仅能看到自己教授的课程的报名
+            # 教师仅能看到自己关联学生的报名
+            sids = teacher_student_ids(db, user['linked_teacher_id'])
 
-            cids = teacher_course_ids(db, user['linked_teacher_id'])
+            if sids:
 
-            if cids:
-
-                placeholders = ','.join('?' * len(cids))
+                placeholders = ','.join('?' * len(sids))
 
                 enrollments = db.execute(f"""
 
@@ -1170,9 +1252,9 @@ def get_enrollments():
 
                     FROM enrollments e JOIN students s ON e.student_id = s.id JOIN courses c ON e.course_id = c.id
 
-                    WHERE e.course_id IN ({placeholders}) AND e.status = ? ORDER BY e.enrolled_date DESC
+                    WHERE e.student_id IN ({placeholders}) AND e.status = ? ORDER BY e.enrolled_date DESC
 
-                """, cids + [status]).fetchall()
+                """, sids + [status]).fetchall()
 
             else:
 
@@ -1316,7 +1398,19 @@ def get_schedules():
 
     if user and user['role'] == 'teacher' and user.get('linked_teacher_id'):
 
-        query += " AND s.teacher_id = ?"; params.append(user['linked_teacher_id'])
+        sids = teacher_student_ids(db, user['linked_teacher_id'])
+
+        if sids:
+
+            placeholders = ','.join('?' * len(sids))
+
+            query += f" AND s.student_id IN ({placeholders})"
+
+            params.extend(sids)
+
+        else:
+
+            query += " AND 1=0"
 
     elif user and user['role'] == 'parent' and user.get('linked_student_id'):
 
@@ -1447,7 +1541,19 @@ def get_records():
 
     if user and user['role'] == 'teacher' and user.get('linked_teacher_id'):
 
-        query += " AND cr.teacher_id = ?"; params.append(user['linked_teacher_id'])
+        sids = teacher_student_ids(db, user['linked_teacher_id'])
+
+        if sids:
+
+            placeholders = ','.join('?' * len(sids))
+
+            query += f" AND cr.student_id IN ({placeholders})"
+
+            params.extend(sids)
+
+        else:
+
+            query += " AND 1=0"
 
     elif user and user['role'] == 'parent' and user.get('linked_student_id'):
 
@@ -1735,6 +1841,26 @@ def active_students():
                WHERE e.status='active' AND s.status='active' AND e.remaining_hours > 0 AND e.student_id = ?
 
                ORDER BY s.name""", (user['linked_student_id'],)).fetchall()
+
+    elif user and user['role'] == 'teacher' and user.get('linked_teacher_id'):
+
+        sids = teacher_student_ids(db, user['linked_teacher_id'])
+
+        if sids:
+
+            placeholders = ','.join('?' * len(sids))
+
+            rows = db.execute(f"""SELECT e.*, s.name as student_name, s.grade, c.name as course_name, c.subject
+
+                   FROM enrollments e JOIN students s ON e.student_id = s.id JOIN courses c ON e.course_id = c.id
+
+                   WHERE e.status='active' AND s.status='active' AND e.remaining_hours > 0
+
+                   AND e.student_id IN ({placeholders}) ORDER BY s.name""", sids).fetchall()
+
+        else:
+
+            rows = []
 
     else:
 
