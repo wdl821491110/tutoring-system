@@ -671,7 +671,7 @@ def dashboard():
                 'total_students': 0, 'total_teachers': db.execute("SELECT COUNT(*) as c FROM teachers WHERE status='active'").fetchone()['c'],
                 'total_courses': db.execute("SELECT COUNT(*) as c FROM courses WHERE status='active'").fetchone()['c'],
                 'today_count': 0, 'today_consumed': 0, 'total_remaining': 0,
-                'today_schedules': [], 'daily_stats': [], 'course_ranking': []
+                'today_schedules': [], 'daily_stats': [], 'course_details': []
             })
     elif user and user['role'] == 'parent' and user.get('linked_student_id'):
         student_filter = " AND e.student_id = ?"
@@ -712,14 +712,26 @@ def dashboard():
         GROUP BY dates.d ORDER BY dates.d
     """, teacher_params).fetchall()
 
-    course_ranking = db.execute(f"""
-        SELECT c.name, c.subject, COALESCE(SUM(cr.hours_consumed), 0) as total_hours
-        FROM courses c
-        LEFT JOIN class_records cr ON c.id = cr.course_id
-            AND cr.record_date >= date('now', '-30 days', 'localtime')
-            {'JOIN students st ON cr.student_id = st.id' if teacher_filter else ''}
-        WHERE c.status = 'active'{teacher_filter.replace('st.id','cr.student_id') if teacher_filter else ''} GROUP BY c.id ORDER BY total_hours DESC LIMIT 10
-    """).fetchall()
+    # 返回每名学生每门课程的原始报名+消耗数据，前端自行聚合
+    course_details = db.execute(f"""
+        SELECT c.id as course_id, c.name as course_name, c.subject,
+               e.student_id, st.name as student_name,
+               e.purchased_hours as enrolled_hours,
+               COALESCE((SELECT SUM(cr.hours_consumed) FROM class_records cr
+                         WHERE cr.student_id = e.student_id AND cr.course_id = e.course_id), 0) as consumed_hours
+        FROM enrollments e
+        JOIN courses c ON e.course_id = c.id
+        JOIN students st ON e.student_id = st.id
+        WHERE e.status = 'active' AND c.status = 'active'{student_filter}
+        ORDER BY c.name, st.name
+    """, student_params).fetchall()
+
+    # 补充教师名
+    details = []
+    for r in course_details:
+        d = dict(r)
+        d['teacher_name'] = get_course_teacher_names(db, d['course_id'])
+        details.append(d)
 
     return api_response(data={
 
@@ -733,7 +745,7 @@ def dashboard():
 
         'daily_stats': [dict(r) for r in daily_stats],
 
-        'course_ranking': [dict(r) for r in course_ranking]
+        'course_details': details
 
     })
 
