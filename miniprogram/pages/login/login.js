@@ -1,10 +1,22 @@
 const { login } = require('../../utils/auth');
 
 Page({
-  data: { username: '', password: '', loading: false },
+  data: { username: '', password: '', loading: false, passwordVisible: false, agreed: false },
+
+  toggleAgree() {
+    this.setData({ agreed: !this.data.agreed });
+  },
 
   onInput(e) {
     this.setData({ [e.currentTarget.dataset.key]: e.detail.value });
+  },
+
+  clearUsername() {
+    this.setData({ username: '' });
+  },
+
+  togglePassword() {
+    this.setData({ passwordVisible: !this.data.passwordVisible });
   },
 
   goPrivacy() {

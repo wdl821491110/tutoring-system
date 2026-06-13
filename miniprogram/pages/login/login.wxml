@@ -1,52 +1,72 @@
 <view class="login-page fade-in">
   <!-- Logo 区 -->
   <view class="login-hero">
-    <view class="login-logo-circle">
-      <text class="login-logo-icon">📚</text>
-    </view>
+    <view class="login-logo-circle">课</view>
     <view class="login-title">课消管理系统</view>
     <view class="login-subtitle">辅导机构课时管理工具</view>
   </view>
 
-  <!-- 输入区 — 卡片式 -->
-  <view class="login-form-card">
-    <view class="login-input-group">
-      <view class="login-input-icon">👤</view>
-      <input
-        class="login-input"
-        placeholder="请输入用户名"
-        placeholder-style="color:#C7C7CC;"
-        value="{{username}}"
-        bindinput="onInput"
-        data-key="username"
-        focus="{{true}}"
-      />
+  <!-- 输入区 — WeUI 表单 -->
+  <view class="weui-cells weui-cells_form">
+    <view class="weui-cell weui-cell_input">
+      <view class="weui-cell__hd">
+        <view class="weui-label">账号</view>
+      </view>
+      <view class="weui-cell__bd">
+        <input
+          class="weui-input"
+          placeholder="请输入用户名"
+          placeholder-style="color:#B2B2B2;"
+          value="{{username}}"
+          bindinput="onInput"
+          data-key="username"
+          focus="{{true}}"
+        />
+      </view>
+      <view wx:if="{{username}}" class="weui-cell__ft">
+        <view class="login-input-clear" bindtap="clearUsername">
+          <text>✕</text>
+        </view>
+      </view>
     </view>
-    <view class="login-input-divider"></view>
-    <view class="login-input-group">
-      <view class="login-input-icon">🔒</view>
-      <input
-        class="login-input"
-        type="password"
-        placeholder="请输入密码"
-        placeholder-style="color:#C7C7CC;"
-        value="{{password}}"
-        bindinput="onInput"
-        data-key="password"
-      />
+    <view class="weui-cell weui-cell_input">
+      <view class="weui-cell__hd">
+        <view class="weui-label">密码</view>
+      </view>
+      <view class="weui-cell__bd">
+        <input
+          class="weui-input"
+          type="{{passwordVisible?'text':'password'}}"
+          placeholder="请输入密码"
+          placeholder-style="color:#B2B2B2;"
+          value="{{password}}"
+          bindinput="onInput"
+          data-key="password"
+        />
+      </view>
+      <view class="weui-cell__ft">
+        <view class="login-input-toggle" bindtap="togglePassword">
+          <text>{{passwordVisible ? '🙈' : '👁'}}</text>
+        </view>
+      </view>
     </view>
   </view>
 
   <!-- 登录按钮 -->
   <view class="login-btn-wrap">
-    <button class="login-btn" loading="{{loading}}" bindtap="doLogin">
+    <button class="weui-btn weui-btn_primary" loading="{{loading}}" disabled="{{!agreed}}" bindtap="doLogin">
       {{loading ? '登录中...' : '登 录'}}
     </button>
   </view>
 
-  <!-- 隐私 -->
+  <!-- 隐私政策 — 主动同意 -->
   <view class="login-footer">
-    <text style="color:#C7C7CC;">登录即表示同意</text>
-    <text class="login-privacy-link" bindtap="goPrivacy">《隐私政策》</text>
+    <view class="login-privacy-agree" bindtap="toggleAgree">
+      <view class="login-checkbox {{agreed?'login-checkbox--checked':''}}">
+        <text wx:if="{{agreed}}" style="color:#fff;font-size:11px;">✓</text>
+      </view>
+      <text class="login-footer-hint">我已阅读并同意</text>
+      <text class="login-privacy-link" hover-class="hover-active" catchtap="goPrivacy">《隐私政策》</text>
+    </view>
   </view>
 </view>

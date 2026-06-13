@@ -1,0 +1,12 @@
+<mp-half-screen-dialog
+  show="{{show}}"
+  title="{{title}}"
+  buttons="{{_buttons}}"
+  bindbuttontap="onButtonTap"
+>
+  <view slot="desc" class="form-sheet-body">
+    <scroll-view scroll-y class="form-sheet-scroll">
+      <slot></slot>
+    </scroll-view>
+  </view>
+</mp-half-screen-dialog>

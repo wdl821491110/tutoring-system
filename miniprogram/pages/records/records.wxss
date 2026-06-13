@@ -1,0 +1,309 @@
+/* ========================================
+   课时记录 — WeUI 风格
+   ======================================== */
+
+/* ---------- 页面 Flex 布局：固定顶部 + 滚动列表 ---------- */
+.page-container {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  padding-bottom: 0;
+}
+
+/* ---------- 固定顶部 ---------- */
+.sticky-top {
+  flex-shrink: 0;
+}
+
+/* ---------- 日期选择器 — 与排课页面相同 ---------- */
+.top-bar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px;
+}
+.top-bar__date {
+  flex: 1;
+  background: #fff;
+  border-radius: 12px;
+  overflow: hidden;
+}
+.filter-today-btn {
+  display: inline-flex;
+  align-items: center;
+  height: 28px;
+  padding: 0 14px;
+  border-radius: 14px;
+  font-size: 13px;
+  color: var(--c-primary);
+  background: var(--c-primary-light);
+  white-space: nowrap;
+}
+
+/* ---------- 标题栏 — 左右对称卡片 ---------- */
+.record-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 0 16px 12px;
+  gap: 12px;
+}
+.record-header__card {
+  background: #F7F8FA;
+  border-radius: 16px;
+  padding: 10px 16px;
+  display: flex;
+  align-items: center;
+}
+.record-header__title {
+  font-size: 16px;
+  font-weight: 600;
+  color: #333;
+}
+.record-header__add-btn {
+  flex-shrink: 0;
+  display: inline-flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  font-size: 16px !important;
+  font-weight: 500 !important;
+  line-height: 1 !important;
+  color: #fff !important;
+  background: var(--c-primary) !important;
+  border: none !important;
+  margin: 0 !important;
+  padding-left: 14px !important;
+  padding-right: 14px !important;
+}
+
+/* ---------- 可滚动列表 ---------- */
+.scroll-body {
+  flex: 1;
+  overflow: hidden;
+}
+
+/* ---------- 列表卡片统一圆角 ---------- */
+.record-list {
+  padding: 12px 0;
+  margin: 0 16px 16px;
+}
+
+.record-list .weui-cell {
+  background: #fff;
+  border-radius: 16px;
+  padding: 16px;
+  margin-bottom: 12px;
+  box-shadow: 0 1px 4px rgba(0,0,0,0.04);
+}
+
+.record-list .weui-cell:last-child {
+  margin-bottom: 0;
+}
+
+/* ---------- 记录 cell ---------- */
+.record-cell {
+  width: 100%;
+}
+.record-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+}
+.record-hours-wrap {
+  display: flex;
+  align-items: center;
+}
+.record-title {
+  font-size: 17px;
+  color: var(--c-text);
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.record-meta {
+  font-size: 14px;
+  color: var(--c-text-secondary);
+  margin-bottom: 2px;
+}
+.record-bottom {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-top: 8px;
+}
+.record-hours {
+  font-size: 17px;
+  color: var(--c-primary);
+}
+.record-remaining {
+  font-size: 12px;
+  color: var(--c-text-hint);
+  margin-left: 8px;
+  padding: 1px 8px;
+  background: #F5F5F5;
+  border-radius: 10px;
+}
+.record-actions {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.record-note {
+  font-size: 14px;
+  color: var(--c-text-secondary);
+}
+.record-undo {
+  font-size: 14px;
+  color: var(--c-danger);
+}
+
+/* ---------- 分页器 ---------- */
+.pager {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  gap: 20px;
+  padding: 20px 0 32px;
+}
+.pager-num {
+  font-size: 14px;
+  color: var(--c-text-secondary);
+}
+
+/* ---------- 备注 ---------- */
+.note-list {
+  padding: 0;
+}
+.note-item {
+  padding: 12px 0;
+  border-bottom: 1px solid #E5E5E5;
+}
+.note-item:last-child {
+  border-bottom: none;
+}
+.note-item__meta {
+  font-size: 12px;
+  color: var(--c-text-hint);
+  margin-bottom: 4px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+.note-delete {
+  font-size: 12px;
+  color: var(--c-danger);
+}
+.note-item__text {
+  font-size: 17px;
+  line-height: 1.6;
+  color: var(--c-text);
+}
+.note-input {
+  width: 100%;
+  min-height: 64px;
+  border: 1px solid #E5E5E5;
+  border-radius: 8px;
+  padding: 10px;
+  font-size: 17px;
+  box-sizing: border-box;
+  margin-top: 14px;
+}
+
+/* ---------- 学生模式 ---------- */
+.record-student-card {
+  background: #fff !important;
+  border-radius: 16px !important;
+  padding: 16px !important;
+  margin-bottom: 12px;
+  box-shadow: 0 1px 4px rgba(0,0,0,0.04);
+}
+.record-student-name {
+  font-size: 17px;
+  font-weight: 700;
+}
+.record-student-total {
+  font-size: 14px;
+  color: var(--c-primary);
+  font-weight: 600;
+}
+.record-sub-item {
+  margin-left: 16px;
+  margin-right: 0;
+  background: #fff;
+  border-radius: 12px;
+  padding: 12px 14px !important;
+  margin-bottom: 8px;
+  box-shadow: 0 1px 2px rgba(0,0,0,0.03);
+}
+.record-sub-item:last-of-type {
+  margin-bottom: 16px;
+}
+.record-sub-item:first-of-type {
+  margin-top: 0;
+}
+.record-sub-item--hidden {
+  display: none;
+}
+.record-expand-btn {
+  text-align: center;
+  padding: 4px 0 14px;
+  font-size: 14px;
+  color: var(--c-primary);
+  font-weight: 500;
+}
+.record-student-info {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+.record-student-actions {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+.record-student-hours {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--c-primary);
+  white-space: nowrap;
+}
+
+/* ---------- 备注空状态 ---------- */
+.note-empty {
+  text-align: center;
+  padding: 30px;
+  color: var(--c-text-hint);
+  font-size: 14px;
+}
+
+/* ---------- 空状态提示文字居中 ---------- */
+.empty-state {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  padding: 60px 20px;
+}
+.empty-hint {
+  text-align: center;
+}
+
+/* ---------- 头像 — 灰度圆角（学生模式用） ---------- */
+.student-avatar {
+  width: 48px;
+  height: 48px;
+  border-radius: 8px;
+  background: #E8E8E8;
+  color: #888;
+  font-size: 20px;
+  font-weight: 500;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  margin-right: 16px;
+}

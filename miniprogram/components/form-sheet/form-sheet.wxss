@@ -1,0 +1,7 @@
+/* form-sheet — 依赖 mp-half-screen-dialog，内容可滚动 */
+.form-sheet-body {
+  padding: 0;
+}
+.form-sheet-scroll {
+  max-height: 55vh;
+}

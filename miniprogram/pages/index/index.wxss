@@ -1,0 +1,150 @@
+/* ========================================
+   首页仪表盘 — WeUI 风格
+   ======================================== */
+
+/* ---------- 骨架屏占位 ---------- */
+.skeleton-dashboard { height: 160px; border-radius: 14px; margin-bottom: 16px; }
+
+/* ---------- 统计卡片 — 两两横向 ---------- */
+.stat-cards {
+  padding: 12px 16px 0;
+}
+
+.stat-row {
+  display: flex;
+  gap: 12px;
+  margin-bottom: 12px;
+}
+
+.stat-card {
+  flex: 1;
+  padding: 20px 12px 16px;
+  border-radius: 16px;
+  border: 1px solid var(--c-border);
+  background: transparent;
+  text-align: center;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  transition: transform 0.15s, box-shadow 0.15s;
+}
+
+.stat-card--hover {
+  box-shadow: 0 2px 12px rgba(0,0,0,0.06);
+  transform: scale(0.97);
+}
+
+.stat-card__num {
+  font-size: 36px;
+  font-weight: 700;
+  color: var(--c-text);
+  line-height: 1.1;
+  letter-spacing: -1px;
+}
+
+.stat-card__label {
+  font-size: 13px;
+  color: var(--c-text-secondary);
+  font-weight: 500;
+}
+
+/* ---------- 排行内容 ---------- */
+.rank-cell__hd {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  margin-bottom: 8px;
+}
+
+.rank-cell__left {
+  display: flex;
+  align-items: baseline;
+  gap: 6px;
+}
+
+.rank-cell__idx {
+  font-size: 15px;
+  color: var(--c-text-secondary);
+  min-width: 20px;
+  text-align: center;
+}
+
+.rank-cell__title {
+  font-size: 17px;
+  color: var(--c-text);
+}
+.rank-cell__sub {
+  font-size: 14px;
+  color: var(--c-text-hint);
+  margin-left: 4px;
+}
+
+.rank-cell__val {
+  font-size: 15px;
+  color: var(--c-text-secondary);
+}
+
+.rank-cell__meta {
+  font-size: 14px;
+  color: var(--c-text-hint);
+  margin-top: 4px;
+}
+
+/* WeUI progress 排行高亮 */
+.weui-progress {
+  margin-top: 6px;
+}
+.weui-progress__inner-bar {
+  opacity: 0.4;
+}
+.weui-progress__inner-bar--active {
+  opacity: 1;
+}
+
+/* ---------- 排行列表项圆角+间距 ---------- */
+.rank-list {
+  padding: 0 16px 16px;
+}
+
+.rank-item {
+  background: #fff;
+  border-radius: 16px;
+  padding: 16px;
+  margin-bottom: 12px;
+  box-shadow: 0 1px 4px rgba(0,0,0,0.04);
+}
+
+.rank-item:last-child {
+  margin-bottom: 0;
+}
+
+/* ---------- 空课程卡片 ---------- */
+.schedule-empty {
+  text-align: center;
+  padding: 48px 32px;
+  background: #fff;
+  margin-bottom: 8px;
+}
+.schedule-empty__icon {
+  margin-bottom: 12px;
+  opacity: 0.4;
+  display: flex;
+  justify-content: center;
+}
+.schedule-empty__text {
+  font-size: 17px;
+  color: var(--c-text-secondary);
+}
+.schedule-empty__hint {
+  font-size: 14px;
+  color: var(--c-text-hint);
+  margin-top: 4px;
+}
+
+/* ---------- weui-cell 描述文字 ---------- */
+.weui-cell__desc {
+  font-size: 14px;
+  color: var(--c-text-secondary);
+  margin-top: 2px;
+}

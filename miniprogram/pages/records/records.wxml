@@ -1,17 +1,40 @@
-<view class="page-container fade-in">
-  <!-- 日期范围 -->
-  <view style="display:flex;gap:8px;align-items:center;margin-bottom:16px;">
-    <view class="date-input-wrap">
-      <input type="date" value="{{dateFrom}}" bindchange="onDateFrom" placeholder="开始日期"/>
+<view class="page-container">
+  <!-- ====== 固定顶部区域 ====== -->
+  <view class="sticky-top">
+    <!-- 视图切换 — weui-tab 风格 -->
+    <view class="view-mode-bar">
+      <view class="view-mode-item {{viewMode==='date'?'view-mode-item--active':''}}" hover-class="{{viewMode==='date'?'':'hover-active'}}" bindtap="switchView" data-mode="date">按日期</view>
+      <view class="view-mode-item {{viewMode==='student'?'view-mode-item--active':''}}" hover-class="{{viewMode==='student'?'':'hover-active'}}" bindtap="switchView" data-mode="student">按学生</view>
     </view>
-    <text style="color:#8E8E93;font-size:14px;">至</text>
-    <view class="date-input-wrap">
-      <input type="date" value="{{dateTo}}" bindchange="onDateTo" placeholder="结束日期"/>
+
+    <!-- 日期选择（按日期模式 — 与排课页面相同） -->
+    <view wx:if="{{viewMode==='date'}}" class="top-bar">
+      <view class="top-bar__date">
+        <view class="weui-cell">
+          <view class="weui-cell__hd"><view class="weui-label">日期</view></view>
+          <view class="weui-cell__bd">
+            <picker mode="date" value="{{pickDate}}" bindchange="onPickDate">
+              <view>{{pickDate||'选择日期'}}</view>
+            </picker>
+          </view>
+          <view class="weui-cell__ft">
+            <view class="filter-today-btn" hover-class="hover-active" bindtap="filterToday">今天</view>
+          </view>
+        </view>
+      </view>
+    </view>
+
+    <!-- 标题栏 — 左右对称卡片（仅按日期模式） -->
+    <view wx:if="{{viewMode==='date' && list.length>0}}" class="record-header">
+      <view class="record-header__card">
+        <text class="record-header__title">课时记录 · {{total}}条</text>
+      </view>
+      <button wx:if="{{isAdmin}}" class="record-header__card record-header__add-btn" bindtap="showAdd"> 新增消课</button>
     </view>
   </view>
 
-  <!-- 骨架屏 -->
-  <view wx:if="{{loading}}">
+  <!-- ====== 骨架屏 ====== -->
+  <view wx:if="{{loading}}" class="fade-in" style="flex:1;overflow-y:auto;padding:0 16px;">
     <view class="skeleton-row" wx:for="{{[0,0,0,0,0]}}" wx:key="*this">
       <view class="skeleton-row__body">
         <view class="skeleton-text"></view>
@@ -20,131 +43,189 @@
     </view>
   </view>
 
-  <!-- 课时记录列表 -->
-  <block wx:else>
-  <view wx:if="{{list.length>0}}">
-    <view class="section-title">课时记录 · {{total}}条</view>
-    <view
-      class="card slide-up"
-      wx:for="{{list}}"
-      wx:key="id"
-      style="padding:14px 16px;margin-bottom:8px;"
-    >
-      <view style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:4px;">
-        <text style="font-size:16px;font-weight:600;flex:1;">{{item.student_name}} · {{item.course_name}}</text>
-        <text class="tag {{item.attendance==='present'?'tag--green':'tag--red'}}">
-          {{item.attendance==='present'?'出勤 ✓':'缺勤 ✗'}}
-        </text>
-      </view>
-      <view class="text-sm text-gray">
-        {{item.record_date}} · {{item.subject}} · {{item.teacher_name||'-'}}
-      </view>
-      <view style="display:flex;justify-content:space-between;align-items:center;margin-top:8px;">
-        <view style="display:flex;align-items:center;gap:8px;">
-          <text style="font-size:14px;font-weight:600;color:var(--c-primary);">{{item.hours_consumed}}课时</text>
-          <text class="tag tag--gray" style="font-size:10px;">剩{{item.remaining_after}}课时</text>
-        </view>
-        <view style="display:flex;align-items:center;gap:10px;">
-          <text style="font-size:13px;color:var(--c-text-secondary);" bindtap="showNotes" data-rid="{{item.id}}">📝 {{item.note_count||0}}</text>
-          <text wx:if="{{isAdmin}}" style="font-size:13px;color:var(--c-danger);" bindtap="undoRecord" data-rid="{{item.id}}">撤销</text>
-        </view>
-      </view>
-    </view>
-  </view>
-
-  <!-- 分页 -->
-  <view wx:if="{{totalPages>1}}" style="display:flex;justify-content:center;align-items:center;gap:20px;padding:20px 0 32px;">
-    <view class="pager-btn {{page<=1?'pager-btn--disabled':''}}" bindtap="prevPage">‹ 上一页</view>
-    <text style="font-size:14px;color:var(--c-text-secondary);font-weight:500;">{{page}} / {{totalPages}}</text>
-    <view class="pager-btn {{page>=totalPages?'pager-btn--disabled':''}}" bindtap="nextPage">下一页 ›</view>
-  </view>
-
-  <!-- 空状态 -->
-  <view wx:if="{{list.length===0}}" class="empty-state">
-    <view class="empty-icon">✅</view>
-    <view class="empty-text">暂无消课记录</view>
-    <view class="empty-hint">去「排课」页面签到，或直接新增消课记录</view>
-  </view>
-
-  <!-- 自定义新增表单弹窗 -->
-  <view class="overlay" wx:if="{{showForm}}" catchtouchmove="noop">
-    <view class="overlay-mask" bindtap="closeForm"></view>
-    <view class="overlay-sheet slide-up">
-      <view class="overlay-header">
-        <text class="overlay-title">新增消课记录</text>
-        <text class="overlay-close" bindtap="closeForm">✕</text>
-      </view>
-      <view class="overlay-body">
-        <view class="form-row">
-          <text class="form-label">学生</text>
-          <picker style="flex:1;" range="{{studentNames}}" value="{{form.studentIdx}}" bindchange="onStudentChange">
-            <view class="form-picker-val">{{studentNames[form.studentIdx]||'请选择'}}</view>
-          </picker>
-        </view>
-        <view class="form-row">
-          <text class="form-label">课程</text>
-          <picker style="flex:1;" range="{{courseNames}}" value="{{form.courseIdx}}" bindchange="onCourseChange">
-            <view class="form-picker-val">{{courseNames[form.courseIdx]||'请选择'}}</view>
-          </picker>
-        </view>
-        <view class="form-row">
-          <text class="form-label">日期</text>
-          <input class="form-input" type="date" value="{{form.record_date}}" data-field="record_date" bindinput="onFieldChange"/>
-        </view>
-        <view class="form-row">
-          <text class="form-label">课时</text>
-          <input class="form-input" type="number" value="{{form.hours_consumed}}" data-field="hours_consumed" bindinput="onFieldChange"/>
-        </view>
-        <view class="form-row">
-          <text class="form-label">出勤</text>
-          <view style="display:flex;gap:20px;flex:1;justify-content:flex-end;">
-            <label style="display:flex;align-items:center;gap:4px;">
-              <radio value="present" checked="{{form.attendance==='present'}}" bindchange="onFieldChange" data-field="attendance" color="#07C160"/>出勤
-            </label>
-            <label style="display:flex;align-items:center;gap:4px;">
-              <radio value="absent" checked="{{form.attendance==='absent'}}" bindchange="onFieldChange" data-field="attendance" color="#FA5151"/>缺勤
-            </label>
+  <!-- ====== 课时记录列表（按日期模式） ====== -->
+  <scroll-view
+    wx:if="{{!loading && viewMode==='date' && list.length>0}}"
+    class="scroll-body"
+    scroll-y
+    enhanced
+    show-scrollbar="{{false}}"
+  >
+    <view class="record-list">
+      <view wx:for="{{list}}" wx:key="id" class="weui-cell">
+          <view class="weui-cell__bd">
+            <view class="record-head">
+              <text class="record-title">{{item.student_name}} · {{item.course_name}}</text>
+              <text class="tag {{item.attendance==='present'?'tag--green':'tag--red'}}">
+                {{item.attendance==='present'?'出勤':'缺勤'}}
+              </text>
+            </view>
+            <view class="record-meta">{{item.subject}} · {{item.teacher_name||'-'}}</view>
+            <view class="record-bottom">
+              <view class="record-hours-wrap">
+                <text class="record-hours">{{item.hours_consumed}}课时</text>
+                <text class="record-remaining">剩{{item.remaining_after}}课时</text>
+              </view>
+              <view class="record-actions">
+                <text class="record-note" hover-class="hover-active" bindtap="showNotes" data-rid="{{item.id}}">{{item.note_count||0}} 备注</text>
+                <text wx:if="{{isAdmin}}" class="record-undo" hover-class="hover-active" bindtap="undoRecord" data-rid="{{item.id}}">撤销</text>
+              </view>
+            </view>
           </view>
         </view>
-        <view class="form-row" style="align-items:flex-start;">
-          <text class="form-label" style="padding-top:8px;">备注</text>
-          <textarea class="form-textarea" placeholder="备注" value="{{form.notes}}" data-field="notes" bindinput="onFieldChange"/>
-        </view>
       </view>
-      <view class="overlay-footer">
-        <button class="overlay-btn overlay-btn--cancel" bindtap="closeForm">取消</button>
-        <button class="overlay-btn overlay-btn--confirm" bindtap="submitRecord">确定消课</button>
+
+    <!-- 分页 -->
+    <view wx:if="{{totalPages>1}}" class="pager">
+      <view class="pager-btn {{page<=1?'pager-btn--disabled':''}}" hover-class="{{page<=1?'':'hover-active'}}" bindtap="prevPage">‹ 上一页</view>
+      <text class="pager-num">{{page}} / {{totalPages}}</text>
+      <view class="pager-btn {{page>=totalPages?'pager-btn--disabled':''}}" hover-class="{{page>=totalPages?'':'hover-active'}}" bindtap="nextPage">下一页 ›</view>
+    </view>
+  </scroll-view>
+
+  <!-- ====== 按学生模式 — Panel图文组合列表 ====== -->
+  <scroll-view
+    wx:if="{{!loading && viewMode==='student' && alphaList.length>0}}"
+    class="scroll-body"
+    scroll-y
+    enhanced
+    show-scrollbar="{{false}}"
+  >
+    <view class="record-list">
+      <block wx:for="{{alphaList}}" wx:key="letter">
+        <view class="alpha-title">{{item.letter}}</view>
+          <block wx:for="{{item.students}}" wx:for-item="stu" wx:key="name">
+            <!-- 学生卡片 — Panel 图文组合 -->
+            <view class="weui-media-box weui-media-box_appmsg record-student-card" hover-class="weui-media-box_active">
+              <view class="weui-media-box__hd">
+                <view class="student-avatar">{{stu.name[0]}}</view>
+              </view>
+              <view class="weui-media-box__bd">
+                <view class="weui-media-box__title">
+                  <text>{{stu.name}}</text>
+                </view>
+                <view class="weui-media-box__desc">累计消课 {{stu.total_hours}} 课时</view>
+              </view>
+            </view>
+            <!-- 学生下的消课记录 -->
+            <view wx:for="{{stu.records}}" wx:for-item="r" wx:for-index="ri" wx:key="id" class="weui-cell record-sub-item {{ri>0 && !expandedMap[stu.name] ? 'record-sub-item--hidden' : ''}}">
+              <view class="weui-cell__bd">
+                <view class="record-student-info">
+                  <text class="text-sm text-gray">{{r.record_date}}</text>
+                  <text class="text-sm">{{r.course_name}}</text>
+                  <text class="tag {{r.attendance==='present'?'tag--green':'tag--red'}}">{{r.attendance==='present'?'出勤':'缺勤'}}</text>
+                </view>
+              </view>
+              <view class="weui-cell__ft">
+                <view class="record-student-actions">
+                  <text class="record-student-hours">{{r.hours_consumed}}课时</text>
+                  <text class="record-note text-xs" hover-class="hover-active" bindtap="showNotes" data-rid="{{r.id}}">{{r.note_count||0}}备注</text>
+                </view>
+              </view>
+            </view>
+            <!-- 查看更多 / 收起 -->
+            <view wx:if="{{stu.records.length>1}}" class="record-expand-btn" hover-class="hover-active" bindtap="toggleExpand" data-name="{{stu.name}}">
+              <text>{{expandedMap[stu.name]?'收起':'查看更多'}}（{{stu.records.length-1}}条）</text>
+            </view>
+          </block>
+        </block>
       </view>
+  </scroll-view>
+
+  <!-- ====== 空状态 ====== -->
+  <view wx:if="{{!loading && ((viewMode==='date' && list.length===0) || (viewMode==='student' && alphaList.length===0))}}" style="flex:1;">
+    <view class="empty-state">
+      <view class="empty-icon">
+        <mp-icon type="info" size="48" color="#B2B2B2"></mp-icon>
+      </view>
+      <view class="empty-text">暂无消课记录</view>
+      <view class="empty-hint">去「排课」页面签到，或直接新增消课记录</view>
+    </view>
+    <view wx:if="{{isAdmin}}" class="fixed-bottom">
+      <button class="weui-btn weui-btn_primary" bindtap="showAdd"> 新增消课</button>
     </view>
   </view>
 
-  <!-- 自定义备注弹窗 -->
-  <view class="overlay" wx:if="{{showNotes}}" catchtouchmove="noop">
-    <view class="overlay-mask" bindtap="closeNotes"></view>
-    <view class="overlay-sheet slide-up" style="max-height:60vh;display:flex;flex-direction:column;">
-      <view class="overlay-header">
-        <text class="overlay-title">备注</text>
-        <text class="overlay-close" bindtap="closeNotes">✕</text>
-      </view>
-      <view class="overlay-body" style="flex:1;overflow-y:auto;">
-        <view wx:if="{{notes.length===0}}" style="text-align:center;padding:30px;color:#C7C7CC;font-size:14px;">暂无备注</view>
-        <view wx:for="{{notes}}" wx:key="id" style="padding:12px 0;border-bottom:1px solid var(--c-divider);">
-          <view style="font-size:12px;color:#C7C7CC;margin-bottom:4px;">{{item.created_at}} · {{item.created_by||''}}</view>
-          <view style="font-size:15px;line-height:1.6;">{{item.content}}</view>
+  <!-- 新增消课记录 — form-sheet -->
+  <form-sheet
+    show="{{showForm}}"
+    title="新增消课记录"
+    confirmText="确定消课"
+    confirmDisabled="{{!formValid}}"
+    submitting="{{submitting}}"
+    bind:cancel="closeForm"
+    bind:confirm="submitRecord"
+  >
+    <view class="weui-cells weui-cells_form">
+      <view class="weui-cell weui-cell_access {{errors.student?'weui-cell--error':''}}" data-error="请选择学生">
+        <view class="weui-cell__hd"><view class="weui-label">学生</view></view>
+        <view class="weui-cell__bd">
+          <picker range="{{studentNames}}" value="{{form.studentIdx}}" bindchange="onStudentChange">
+            <view class="{{!studentNames[form.studentIdx]&&errors.student?'weui-cell--error-text':''}}">{{studentNames[form.studentIdx]||'请选择'}}</view>
+          </picker>
         </view>
-        <view style="margin-top:14px;">
-          <textarea style="width:100%;min-height:64px;border:1px solid var(--c-border);border-radius:10px;padding:10px;font-size:14px;box-sizing:border-box;" placeholder="输入备注内容" value="{{newNoteContent}}" bindinput="onNoteInput"/>
+        <view class="weui-cell__ft weui-cell__ft_in-access"></view>
+      </view>
+      <view class="weui-cell weui-cell_access {{errors.course?'weui-cell--error':''}}" data-error="请选择课程">
+        <view class="weui-cell__hd"><view class="weui-label">课程</view></view>
+        <view class="weui-cell__bd">
+          <picker range="{{courseNames}}" value="{{form.courseIdx}}" bindchange="onCourseChange">
+            <view class="{{!courseNames[form.courseIdx]&&errors.course?'weui-cell--error-text':''}}">{{courseNames[form.courseIdx]||'请选择'}}</view>
+          </picker>
+        </view>
+        <view class="weui-cell__ft weui-cell__ft_in-access"></view>
+      </view>
+      <view class="weui-cell weui-cell_access">
+        <view class="weui-cell__hd"><view class="weui-label">日期</view></view>
+        <view class="weui-cell__bd">
+          <picker mode="date" value="{{form.record_date}}" bindchange="onFormDateChange">
+            <view>{{form.record_date||'选择日期'}}</view>
+          </picker>
+        </view>
+        <view class="weui-cell__ft weui-cell__ft_in-access"></view>
+      </view>
+      <view class="weui-cell">
+        <view class="weui-cell__hd"><view class="weui-label">课时</view></view>
+        <view class="weui-cell__bd">
+          <input class="weui-input" type="number" placeholder="课时数" value="{{form.hours_consumed}}" data-field="hours_consumed" bindinput="onFieldChange"/>
         </view>
       </view>
-      <view class="overlay-footer">
-        <button class="overlay-btn overlay-btn--cancel" bindtap="closeNotes">关闭</button>
-        <button class="overlay-btn overlay-btn--confirm" bindtap="addNote">添加</button>
+      <view class="weui-cell">
+        <view class="weui-cell__hd"><view class="weui-label">出勤</view></view>
+        <view class="weui-cell__bd">
+          <radio-group bindchange="onRadioChange" style="display:flex;gap:12px;">
+            <label style="display:flex;align-items:center;gap:2px;font-size:15px;">
+              <radio value="present" checked="{{form.attendance==='present'}}" color="#07C160"/>出勤
+            </label>
+            <label style="display:flex;align-items:center;gap:2px;font-size:15px;">
+              <radio value="absent" checked="{{form.attendance==='absent'}}" color="#FA5151"/>缺勤
+            </label>
+          </radio-group>
+        </view>
+      </view>
+      <view class="weui-cell">
+        <view class="weui-cell__hd"><view class="weui-label">备注</view></view>
+        <view class="weui-cell__bd">
+          <textarea placeholder="备注" value="{{form.notes}}" data-field="notes" bindinput="onFieldChange" style="width:100%;min-height:60px;font-size:15px;padding:4px 0;"/>
+        </view>
       </view>
     </view>
-  </view>
+  </form-sheet>
 
-  <view class="fixed-bottom">
-    <button class="fixed-btn" bindtap="showAdd">＋ 新增消课记录</button>
-  </view>
-  </block>
+  <!-- 备注弹窗 — mp-half-screen-dialog -->
+  <mp-half-screen-dialog
+    show="{{showNotes}}"
+    title="备注"
+    buttons="{{noteButtons}}"
+    bindbuttontap="onNoteButtonTap"
+  >
+    <view slot="desc" class="note-list">
+      <view wx:if="{{notes.length===0}}" class="note-empty">暂无备注</view>
+      <view wx:for="{{notes}}" wx:key="id" class="note-item">
+        <view class="note-item__meta">{{item.created_at}} · {{item.created_by||''}}<text wx:if="{{isAdmin}}" class="note-delete" hover-class="hover-active" bindtap="deleteNote" data-nid="{{item.id}}">删除</text></view>
+        <view class="note-item__text">{{item.content}}</view>
+      </view>
+      <textarea class="note-input" placeholder="输入备注内容" value="{{newNoteContent}}" bindinput="onNoteInput"/>
+    </view>
+  </mp-half-screen-dialog>
 </view>

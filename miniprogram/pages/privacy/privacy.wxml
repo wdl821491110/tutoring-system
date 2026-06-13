@@ -1,35 +1,35 @@
 <view class="page-container">
-  <view style="padding: 16px 0;">
-    <view style="font-size: 20px; font-weight: 700; margin-bottom: 16px;">隐私政策</view>
-    <view style="font-size: 13px; color: #888; margin-bottom: 24px;">更新日期：2026年6月</view>
-
-    <view style="font-size: 15px; line-height: 1.8;">
-      <view style="font-weight: 700; margin-bottom: 8px;">一、我们收集的信息</view>
-      <view style="margin-bottom: 16px;">本小程序为辅导机构内部管理工具，收集以下信息用于课消管理：
-        1. 账号信息：用户名、密码，用于登录认证。
-        2. 学生信息：姓名、性别、年级、学校、家长联系方式，用于学生课时管理。
-        3. 课程与排课信息：课程名称、排课时间、课时消耗记录。
-      </view>
-
-      <view style="font-weight: 700; margin-bottom: 8px;">二、信息的使用</view>
-      <view style="margin-bottom: 16px;">所有收集的信息仅用于课消管理系统内部功能，包括：
-        - 学生课时统计与展示
-        - 排课与消课记录管理
-        - 机构内部数据备份
-        我们不会将您的信息分享、出售或提供给任何第三方。
-      </view>
-
-      <view style="font-weight: 700; margin-bottom: 8px;">三、信息的存储与安全</view>
-      <view style="margin-bottom: 16px;">您的数据存储在腾讯云 CloudBase 安全服务器上，传输过程使用 HTTPS 加密。
-        我们采取合理的安全措施保护您的信息不被未授权访问、篡改或泄露。
-      </view>
-
-      <view style="font-weight: 700; margin-bottom: 8px;">四、您的权利</view>
-      <view style="margin-bottom: 16px;">您可以随时查看、修改或删除您的数据。如需删除账号和数据，请联系机构管理员。
-      </view>
-
-      <view style="font-weight: 700; margin-bottom: 8px;">五、联系我们</view>
-      <view>如有隐私相关问题，请联系辅导机构管理员或小程序开发者。</view>
+  <view class="weui-article">
+    <view class="weui-article__h1">隐私政策</view>
+    <view class="weui-article__section">
+      <view class="weui-article__p" style="color:var(--c-text-hint);font-size:14px;">更新日期：2026年6月</view>
+    </view>
+    <view class="weui-article__section">
+      <view class="weui-article__h3">一、我们收集的信息</view>
+      <view class="weui-article__p">本小程序为辅导机构内部管理工具，收集以下信息用于课消管理：</view>
+      <view class="weui-article__p">1. 账号信息：用户名、密码，用于登录认证。</view>
+      <view class="weui-article__p">2. 学生信息：姓名、性别、年级、学校、家长联系方式，用于学生课时管理。</view>
+      <view class="weui-article__p">3. 课程与排课信息：课程名称、排课时间、课时消耗记录。</view>
+    </view>
+    <view class="weui-article__section">
+      <view class="weui-article__h3">二、信息的使用</view>
+      <view class="weui-article__p">所有收集的信息仅用于课消管理系统内部功能，包括：</view>
+      <view class="weui-article__p">- 学生课时统计与展示</view>
+      <view class="weui-article__p">- 排课与消课记录管理</view>
+      <view class="weui-article__p">- 机构内部数据备份</view>
+      <view class="weui-article__p">我们不会将您的信息分享、出售或提供给任何第三方。</view>
+    </view>
+    <view class="weui-article__section">
+      <view class="weui-article__h3">三、信息的存储与安全</view>
+      <view class="weui-article__p">您的数据存储在腾讯云 CloudBase 安全服务器上，传输过程使用 HTTPS 加密。我们采取合理的安全措施保护您的信息不被未授权访问、篡改或泄露。</view>
+    </view>
+    <view class="weui-article__section">
+      <view class="weui-article__h3">四、您的权利</view>
+      <view class="weui-article__p">您可以随时查看、修改或删除您的数据。如需删除账号和数据，请联系机构管理员。</view>
+    </view>
+    <view class="weui-article__section">
+      <view class="weui-article__h3">五、联系我们</view>
+      <view class="weui-article__p">如有隐私相关问题，请联系辅导机构管理员或小程序开发者。</view>
     </view>
   </view>
 </view>

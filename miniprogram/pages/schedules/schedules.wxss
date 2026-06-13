@@ -1,0 +1,220 @@
+/* ========================================
+   排课管理 — WeUI 风格
+   ======================================== */
+
+/* ---------- 页面 Flex 布局：固定顶部 + 滚动列表 ---------- */
+.page-container {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  padding-bottom: 0;
+}
+
+/* ---------- 固定顶部 ---------- */
+.sticky-top {
+  flex-shrink: 0;
+}
+
+/* ---------- 今天快捷按钮 ---------- */
+.filter-today-btn {
+  display: inline-flex;
+  align-items: center;
+  height: 28px;
+  padding: 0 14px;
+  border-radius: 14px;
+  font-size: 13px;
+  color: var(--c-primary);
+  background: var(--c-primary-light);
+  white-space: nowrap;
+}
+
+/* ---------- 顶部工具栏 — 日期 + 批量签到同行 ---------- */
+.top-bar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px;
+}
+
+.top-bar__date {
+  flex: 1;
+  background: #fff;
+  border-radius: 12px;
+  overflow: hidden;
+}
+
+.top-bar__batch {
+  display: flex;
+  gap: 6px;
+  padding: 0 6px;
+}
+
+/* ---------- 批量签到卡片 — 独立圆角 ---------- */
+.batch-card {
+  display: flex;
+  gap: 8px;
+  padding: 12px 16px;
+  margin: 0 8px 8px;
+  background: #fff;
+  border-radius: 12px;
+  box-shadow: 0 1px 4px rgba(0,0,0,0.04);
+}
+
+/* ---------- 批量签到按钮 ---------- */
+.schedule-batch-btn {
+  display: inline-flex;
+  align-items: center;
+  height: 28px;
+  padding: 0 14px;
+  border-radius: 14px;
+  font-size: 13px;
+  white-space: nowrap;
+  color: var(--c-primary);
+  background: var(--c-primary-light);
+  font-weight: 500;
+}
+.schedule-batch-btn--green {
+  color: #fff;
+  background: var(--c-primary);
+}
+.schedule-batch-btn--gray {
+  color: var(--c-text-hint);
+  background: #F0F0F0;
+}
+
+/* 状态胶囊 — 两端对齐 */
+.filter-status {
+  display: flex;
+  justify-content: space-between;
+  padding: 4px 8px 8px;
+}
+
+.filter-status .filter-pill {
+  padding: 0 18px;
+}
+
+/* ---------- 标题栏 — 左右对称卡片 ---------- */
+.schedule-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 0 16px 12px;
+  gap: 12px;
+}
+.schedule-header__card {
+  background: #F7F8FA;
+  border-radius: 16px;
+  padding: 10px 16px;
+  display: flex;
+  align-items: center;
+}
+.schedule-header__title {
+  font-size: 16px;
+  font-weight: 600;
+  color: #333;
+}
+.schedule-header__add-btn {
+  flex-shrink: 0;
+  display: inline-flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  font-size: 16px !important;
+  font-weight: 500 !important;
+  line-height: 1 !important;
+  color: #fff !important;
+  background: var(--c-primary) !important;
+  border: none !important;
+  margin: 0 !important;
+  padding-left: 14px !important;
+  padding-right: 14px !important;
+}
+
+/* ---------- 可滚动列表 ---------- */
+.scroll-body {
+  flex: 1;
+  overflow: hidden;
+}
+
+/* ---------- 排课 cell ---------- */
+.schedule-cell__hd {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 4px;
+}
+.schedule-cell__left {
+  display: flex;
+  align-items: baseline;
+  gap: 6px;
+  min-width: 0;
+}
+.schedule-cell__title {
+  font-size: 18px;
+  color: var(--c-text);
+  font-weight: 500;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.schedule-cell__hours {
+  font-size: 14px;
+  color: var(--c-text-hint);
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+
+/* 状态标签居中 */
+.schedule-cell__hd .tag {
+  flex-shrink: 0;
+  margin-left: 8px;
+}
+
+.schedule-cell__meta {
+  font-size: 14px;
+  color: var(--c-text-secondary);
+  margin-bottom: 2px;
+}
+
+/* 操作按钮 */
+.schedule-actions {
+  display: flex;
+  gap: 6px;
+  margin-top: 10px;
+}
+
+/* ---------- 列表卡片统一圆角 ---------- */
+.schedule-list {
+  padding: 12px 0;
+  margin: 0 16px 16px;
+}
+
+.schedule-list .weui-cell {
+  background: #fff;
+  border-radius: 16px;
+  padding: 16px;
+  margin-bottom: 12px;
+  box-shadow: 0 1px 4px rgba(0,0,0,0.04);
+}
+
+.schedule-list .weui-cell:last-child {
+  margin-bottom: 0;
+}
+
+/* 编辑按钮 */
+.schedule-action--warn { background: #FFF3E0; color: #FF9800; }
+
+/* 批量签到复选框 */
+.batch-checkbox {
+  width: 22px;
+  height: 22px;
+  border: 2px solid var(--c-border);
+  border-radius: 4px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin-right: 12px;
+  flex-shrink: 0;
+  font-size: 14px;
+  color: var(--c-primary);
+  background: #fff;
+}

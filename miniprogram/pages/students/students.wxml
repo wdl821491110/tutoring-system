@@ -1,19 +1,30 @@
-﻿<view class="page-container fade-in">
-  <!-- 自定义搜索栏 -->
-  <view class="custom-search">
-    <view class="custom-search-icon">🔍</view>
-    <input
-      class="custom-search-input"
-      placeholder="搜索学生姓名/学校..."
-      placeholder-style="color:#C7C7CC;"
+<view class="page-container">
+  <!-- ====== 固定顶部区域 ====== -->
+  <view class="sticky-top">
+    <!-- 搜索栏 -->
+    <mp-searchbar
       value="{{search}}"
-      bindinput="onSearch"
-    />
-    <view class="custom-search-clear" wx:if="{{search}}" bindtap="onClearSearch">✕</view>
+      placeholder="搜索学生姓名/学校..."
+      bindinput="onSearchBarInput"
+      bindcancel="onSearchBarCancel"
+    ></mp-searchbar>
+
+    <!-- 标题栏 — 左右对称卡片 -->
+    <view wx:if="{{students.length>0 && !search}}" class="student-header">
+      <view class="student-header__card">
+        <text class="student-header__title">学生列表 · {{students.length}}人</text>
+      </view>
+      <button wx:if="{{isAdmin}}" class="student-header__card student-header__add-btn" bindtap="showAdd"> 添加学生</button>
+    </view>
+    <view wx:elif="{{students.length>0}}" class="student-header">
+      <view class="student-header__card">
+        <text class="student-header__title">搜索结果 · {{students.length}}人</text>
+      </view>
+    </view>
   </view>
 
-  <!-- 骨架屏 -->
-  <view wx:if="{{loading}}">
+  <!-- ====== 骨架屏 ====== -->
+  <view wx:if="{{loading}}" class="fade-in" style="flex:1;overflow-y:auto;padding:0 16px;">
     <view class="skeleton-row" wx:for="{{[0,0,0,0,0]}}" wx:key="*this">
       <view class="skeleton-avatar"></view>
       <view class="skeleton-row__body">
@@ -23,110 +34,127 @@
     </view>
   </view>
 
-  <!-- 学生列表 -->
-  <block wx:else>
-  <view wx:if="{{students.length>0}}">
-    <view class="section-title">{{search?'搜索结果':'学生列表'}} · {{students.length}}人</view>
-    <view
-      class="card slide-up"
-      wx:for="{{students}}"
-      wx:key="id"
-      style="display:flex;align-items:center;padding:14px;margin-bottom:8px;"
-    >
-      <!-- 头像 -->
-      <view class="student-avatar"
-        style="background:{{item.gender==='女'?'linear-gradient(135deg,#FF85A2,#FF5776)':'linear-gradient(135deg,#10AEFF,#098BD6)'}};">
-        {{item.name[0]}}
+  <!-- ====== 可滚动学生列表 ====== -->
+  <scroll-view
+    wx:if="{{!loading && students.length>0}}"
+    class="scroll-body"
+    scroll-y
+    enhanced
+    show-scrollbar="{{false}}"
+  >
+    <view class="student-list">
+      <mp-slideview
+          wx:for="{{students}}"
+          wx:key="id"
+          buttons="{{slideButtons}}"
+          bindbuttontap="onSlideButtonTap"
+          data-student="{{item}}"
+        >
+          <view class="weui-media-box weui-media-box_appmsg" hover-class="weui-media-box_active" style="background:#fff;border-radius:16px;padding:16px;box-shadow:0 1px 4px rgba(0,0,0,0.04);">
+            <view class="weui-media-box__hd">
+              <view class="student-avatar">{{item.name[0]}}</view>
+            </view>
+            <view class="weui-media-box__bd">
+              <view class="weui-media-box__title">
+                <text>{{item.name}}</text>
+                <text class="student-gender">· {{item.gender}}</text>
+                <text class="student-grade">{{item.grade||''}}</text>
+                <text class="student-school" wx:if="{{item.school}}">{{item.school}}</text>
+              </view>
+              <view wx:if="{{item.enrollments && item.enrollments.length>0}}" class="student-courses">
+                <text class="student-course-tag" wx:for="{{item.enrollments}}" wx:for-item="e" wx:key="id">{{e.course_name}} {{e.remaining_hours}}课时</text>
+              </view>
+              <view wx:if="{{item.teacher_names}}" class="weui-media-box__desc" style="margin-top:8px;">教师：{{item.teacher_names}}</view>
+            </view>
+          </view>
+        </mp-slideview>
+    </view>
+  </scroll-view>
+
+  <!-- ====== 空状态 ====== -->
+  <view wx:if="{{!loading && students.length===0}}" style="flex:1;">
+    <view class="empty-state">
+      <view class="empty-icon">
+        <mp-icon type="info" size="48" color="#B2B2B2"></mp-icon>
       </view>
-      <!-- 信息 -->
-      <view style="flex:1;margin-left:12px;min-width:0;">
-        <view style="display:flex;align-items:center;gap:6px;">
-          <text style="font-size:16px;font-weight:600;">{{item.name}}</text>
-          <text class="tag {{item.gender==='女'?'tag--red':'tag--blue'}}" style="font-size:10px;">{{item.gender}}</text>
-        </view>
-        <view class="text-sm text-gray">{{item.grade||''}}{{item.grade&&item.school?' · ':''}}{{item.school||'未填学校'}}</view>
-        <view wx:if="{{item.enrollments && item.enrollments.length>0}}" style="display:flex;flex-wrap:wrap;gap:4px;margin-top:6px;">
-          <text class="tag tag--green" wx:for="{{item.enrollments}}" wx:for-item="e" wx:key="id" style="font-size:10px;">
-            {{e.course_name}} {{e.remaining_hours}}课时
-          </text>
-        </view>
-      </view>
-      <!-- 操作 -->
-      <view wx:if="{{isAdmin}}" style="display:flex;flex-direction:column;gap:4px;margin-left:8px;">
-        <view style="width:32px;height:32px;display:flex;align-items:center;justify-content:center;background:#F5F5F5;border-radius:8px;" bindtap="showEdit" data-student="{{item}}">
-          <text style="font-size:14px;">✏️</text>
-        </view>
-        <view style="width:32px;height:32px;display:flex;align-items:center;justify-content:center;background:var(--c-danger-light);border-radius:8px;" bindtap="deleteStudent" data-student="{{item}}">
-          <text style="font-size:14px;color:var(--c-danger);">🗑</text>
-        </view>
-      </view>
+      <view class="empty-text">{{search?'未搜索到相关学生':'暂无学生数据'}}</view>
+      <view class="empty-hint" wx:if="{{!search}}">点击下方按钮添加第一个学生</view>
+    </view>
+    <view wx:if="{{isAdmin && !search}}" class="fixed-bottom">
+      <button class="weui-btn weui-btn_primary" bindtap="showAdd">＋ 添加学生</button>
     </view>
   </view>
 
-  <!-- 空状态 -->
-  <view wx:if="{{students.length===0}}" class="empty-state">
-    <view class="empty-icon">👨‍🎓</view>
-    <view class="empty-text">{{search?'未搜索到相关学生':'暂无学生数据'}}</view>
-    <view class="empty-hint" wx:if="{{!search}}">点击下方按钮添加第一个学生</view>
-  </view>
-
-  <!-- 自定义表单弹窗 -->
-  <view class="overlay" wx:if="{{showForm}}" catchtouchmove="noop">
-    <view class="overlay-mask" bindtap="closeForm"></view>
-    <view class="overlay-sheet slide-up">
-      <view class="overlay-header">
-        <text class="overlay-title">{{editing?'编辑学生':'添加学生'}}</text>
-        <text class="overlay-close" bindtap="closeForm">✕</text>
-      </view>
-      <view class="overlay-body">
-        <!-- 表单行 -->
-        <view class="form-row">
-          <text class="form-label">姓名</text>
-          <input class="form-input" placeholder="请输入学生姓名" value="{{form.name}}" data-field="name" bindinput="onFieldChange"/>
+  <!-- 表单弹窗 — form-sheet 组件 -->
+  <form-sheet
+    show="{{showForm}}"
+    title="{{editing?'编辑学生':'添加学生'}}"
+    confirmDisabled="{{!formValid}}"
+    submitting="{{submitting}}"
+    bind:cancel="closeForm"
+    bind:confirm="submitForm"
+  >
+    <view class="weui-cells weui-cells_form">
+      <view class="weui-cell {{errors.name?'weui-cell--error':''}}" data-error="请输入姓名">
+        <view class="weui-cell__hd"><view class="weui-label">姓名</view></view>
+        <view class="weui-cell__bd">
+          <input class="weui-input" placeholder="请输入学生姓名" value="{{form.name}}" data-field="name" bindinput="onFieldChange" bindblur="onFieldBlur"/>
         </view>
-        <view class="form-row">
-          <text class="form-label">性别</text>
-          <view style="display:flex;gap:20px;flex:1;justify-content:flex-end;">
-            <radio-group bindchange="onGenderChange" style="display:flex;gap:20px;align-items:center;">
-              <label style="display:flex;align-items:center;gap:4px;">
-                <radio value="男" checked="{{form.gender==='男'}}" color="#07C160"/>男
-              </label>
-              <label style="display:flex;align-items:center;gap:4px;">
-                <radio value="女" checked="{{form.gender==='女'}}" color="#07C160"/>女
-              </label>
-            </radio-group>
+      </view>
+      <view class="weui-cell">
+        <view class="weui-cell__hd"><view class="weui-label">性别</view></view>
+        <view class="weui-cell__bd">
+          <radio-group bindchange="onGenderChange" style="display:flex;gap:12px;">
+            <label style="display:flex;align-items:center;gap:2px;font-size:15px;">
+              <radio value="男" checked="{{form.gender==='男'}}" color="#07C160"/>男
+            </label>
+            <label style="display:flex;align-items:center;gap:2px;font-size:15px;">
+              <radio value="女" checked="{{form.gender==='女'}}" color="#07C160"/>女
+            </label>
+          </radio-group>
+        </view>
+      </view>
+      <view class="weui-cell">
+        <view class="weui-cell__hd"><view class="weui-label">年级</view></view>
+        <view class="weui-cell__bd">
+          <input class="weui-input" placeholder="年级" value="{{form.grade}}" data-field="grade" bindinput="onFieldChange"/>
+        </view>
+      </view>
+      <view class="weui-cell">
+        <view class="weui-cell__hd"><view class="weui-label">学校</view></view>
+        <view class="weui-cell__bd">
+          <input class="weui-input" placeholder="学校名称" value="{{form.school}}" data-field="school" bindinput="onFieldChange"/>
+        </view>
+      </view>
+      <view class="weui-cell">
+        <view class="weui-cell__hd"><view class="weui-label">家长</view></view>
+        <view class="weui-cell__bd">
+          <input class="weui-input" placeholder="家长姓名" value="{{form.parent_name}}" data-field="parent_name" bindinput="onFieldChange"/>
+        </view>
+      </view>
+      <view class="weui-cell {{errors.parent_phone?'weui-cell--error':''}}" data-error="手机号格式不正确">
+        <view class="weui-cell__hd"><view class="weui-label">电话</view></view>
+        <view class="weui-cell__bd">
+          <input class="weui-input" type="number" placeholder="手机号" value="{{form.parent_phone}}" data-field="parent_phone" bindinput="onFieldChange"/>
+        </view>
+      </view>
+      <view class="weui-cell">
+        <view class="weui-cell__hd"><view class="weui-label">教师</view></view>
+        <view class="weui-cell__bd" style="padding:0;">
+          <view wx:for="{{teachers}}" wx:key="id" class="weui-cell" style="margin:0;padding:10px 0;" bindtap="onTeacherSelect" data-id="{{item.id}}">
+            <view class="weui-cell__hd" style="margin-right:8px;">
+              <checkbox value="{{item.id}}" checked="{{form.teacher_ids.indexOf(item.id) > -1}}" color="#07C160" catchtap="preventBubble"/>
+            </view>
+            <view class="weui-cell__bd" style="font-size:15px;">{{item.name}}</view>
           </view>
         </view>
-        <view class="form-row">
-          <text class="form-label">年级</text>
-          <input class="form-input" placeholder="年级" value="{{form.grade}}" data-field="grade" bindinput="onFieldChange"/>
-        </view>
-        <view class="form-row">
-          <text class="form-label">学校</text>
-          <input class="form-input" placeholder="学校名称" value="{{form.school}}" data-field="school" bindinput="onFieldChange"/>
-        </view>
-        <view class="form-row">
-          <text class="form-label">家长</text>
-          <input class="form-input" placeholder="家长姓名" value="{{form.parent_name}}" data-field="parent_name" bindinput="onFieldChange"/>
-        </view>
-        <view class="form-row">
-          <text class="form-label">电话</text>
-          <input class="form-input" type="number" placeholder="手机号" value="{{form.parent_phone}}" data-field="parent_phone" bindinput="onFieldChange"/>
-        </view>
-        <view class="form-row" style="align-items:flex-start;">
-          <text class="form-label" style="padding-top:8px;">备注</text>
-          <textarea class="form-textarea" placeholder="备注信息" value="{{form.notes}}" data-field="notes" bindinput="onFieldChange"/>
-        </view>
       </view>
-      <view class="overlay-footer">
-        <button class="overlay-btn overlay-btn--cancel" bindtap="closeForm">取消</button>
-        <button class="overlay-btn overlay-btn--confirm" bindtap="submitForm">保存</button>
+      <view class="weui-cell">
+        <view class="weui-cell__hd"><view class="weui-label">备注</view></view>
+        <view class="weui-cell__bd">
+          <textarea placeholder="备注信息" value="{{form.notes}}" data-field="notes" bindinput="onFieldChange" style="width:100%;min-height:60px;font-size:15px;padding:4px 0;"/>
+        </view>
       </view>
     </view>
-  </view>
-
-  <view wx:if="{{isAdmin}}" class="fixed-bottom">
-    <button class="fixed-btn" bindtap="showAdd">＋ 添加学生</button>
-  </view>
-  </block>
+  </form-sheet>
 </view>

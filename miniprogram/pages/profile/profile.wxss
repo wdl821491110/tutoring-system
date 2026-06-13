@@ -1,91 +1,108 @@
 /* ========================================
-   个人中心页
+   个人中心 — WeUI 风格
    ======================================== */
 
-/* 用户头像 */
-.profile-hero {
-  margin-bottom: var(--space-md);
+/* ---------- 页面 Flex 布局：固定顶部 + 滚动列表 ---------- */
+.page-container {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  padding-bottom: 0;
+}
+.sticky-top {
+  flex-shrink: 0;
+}
+.scroll-body {
+  flex: 1;
+  overflow: hidden;
 }
 
-.profile-avatar {
-  width: 72px;
-  height: 72px;
+/* 用户头像区 — 圆角卡片 */
+.profile-hero {
+  text-align: center;
+  padding: 32px 16px 24px;
+  background: #fff;
+  border-radius: 16px;
+  margin: 8px 8px 12px;
+  box-shadow: 0 1px 4px rgba(0,0,0,0.04);
+}
+.profile-avatar-wrap {
+  position: relative;
+  width: 64px;
+  height: 64px;
   margin: 0 auto 12px;
-  border-radius: 50%;
-  background: var(--c-primary-gradient);
-  color: #fff;
-  font-size: 30px;
-  font-weight: 700;
+}
+.profile-avatar {
+  width: 64px;
+  height: 64px;
+  border-radius: 8px;
+  background: #E8E8E8;
+  color: #888;
+  font-size: 28px;
   display: flex;
   align-items: center;
   justify-content: center;
-  box-shadow: 0 6px 20px rgba(7,193,96,0.3);
 }
-
+.profile-avatar-img {
+  width: 64px;
+  height: 64px;
+  border-radius: 8px;
+}
+.profile-avatar-badge {
+  position: absolute;
+  right: -4px;
+  bottom: -4px;
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  background: #fff;
+  border: 1px solid #E5E5E5;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
 .profile-name {
   font-size: 20px;
-  font-weight: 700;
   color: var(--c-text);
 }
 
-/* 单元格 */
-.profile-cell {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  padding: 14px 16px;
-  border-top: 1px solid var(--c-divider);
+/* ---------- 面板卡片圆角统一 ---------- */
+.profile-panel {
+  padding: 0 8px 8px;
 }
 
-.profile-cell:first-child {
-  border-top: none;
+.profile-panel .weui-cells {
+  border-radius: 16px;
+  overflow: hidden;
+  margin-bottom: 12px;
+  box-shadow: 0 1px 4px rgba(0,0,0,0.04);
 }
 
-.profile-cell--link {
-  cursor: pointer;
-}
-
-.profile-cell--link:active {
-  background: #F9F9F9;
-}
-
-.profile-cell-key {
-  font-size: 15px;
-  color: var(--c-text);
-}
-
-.profile-cell-val {
+/* 权限状态 — 灰度化 */
+.text-green, .text-red {
+  color: var(--c-text-secondary) !important;
   font-size: 14px;
-  color: var(--c-text-secondary);
-  font-weight: 500;
 }
 
-.profile-cell-arrow {
-  font-size: 20px;
-  color: var(--c-text-hint);
-  font-weight: 300;
+/* 底部 */
+.profile-footer {
+  margin-top: 32px;
+  text-align: center;
 }
-
-/* 退出按钮 */
-.logout-btn {
+.logout-wrap {
   width: 200px;
-  height: 40px;
-  font-size: 15px;
-  color: var(--c-danger);
-  background: var(--c-card);
-  border: 1px solid var(--c-danger);
-  border-radius: var(--r-md);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  padding: 0;
   margin: 0 auto;
 }
-
-.logout-btn::after {
-  border: none;
+.profile-version {
+  font-size: 12px;
+  color: var(--c-text-hint);
+  margin-top: 16px;
 }
 
-.logout-btn:active {
-  background: var(--c-danger-light);
-}
+/* 骨架屏占位 */
+.skeleton-hero  { height: 120px; border-radius: 14px; margin-bottom: 16px; }
+.skeleton-block { height: 80px; border-radius: 14px; margin-bottom: 16px; }
+.skeleton-panel { height: 100px; border-radius: 14px; margin-bottom: 16px; }
+
+/* 角色标签间距 */
+.profile-hero .tag { margin-top: 6px; }

@@ -1,4 +1,5 @@
 const app = getApp();
+const { validate } = require('../../utils/validator');
 const STATUS_MAP = ['', 'scheduled', 'completed', 'cancelled'];
 
 Page({
@@ -7,9 +8,18 @@ Page({
     list: [], loading: true,
     dateFilter: '', statusIdx: 0,
     showForm: false,
+    submitting: false,
     students: [], courses: [], enrollments: [],
     studentNames: [], courseNames: [],
-    form: { studentIdx: 0, courseIdx: 0, schedule_date: '', start_time: '', end_time: '', hours: 1, notes: '' }
+    form: { studentIdx: 0, courseIdx: 0, schedule_date: '', start_time: '', end_time: '', hours: 1, notes: '' },
+    errors: {},
+    formValid: false,
+    /* 排课编辑 */
+    editingId: null,
+    /* 批量签到 */
+    batchMode: false,
+    checkedIds: [],
+    batchSubmitting: false
   },
 
   onShow() {
@@ -38,7 +48,7 @@ Page({
     }
 
     return app.api(url).then((res) => {
-      const list = res.code === 200 ? (res.data || []) : [];
+      const list = res.data || [];
       this._cache = { time: Date.now(), data: list };
       this.setData({ list, loading: false });
     }).catch(() => {
@@ -53,7 +63,7 @@ Page({
     this.load(true);
   },
 
-  onDateChange(e) { this.setData({ dateFilter: e.detail }); this.load(true); },
+  onDateChange(e) { this.setData({ dateFilter: e.detail.value }); this.load(true); },
 
   onStatusChange(e) {
     this.setData({ statusIdx: parseInt(e.currentTarget.dataset.idx) });
@@ -83,16 +93,23 @@ Page({
       success: (r) => {
         if (!r.confirm) return;
         app.api(`/api/schedules/${id}/cancel`, { method: 'POST' }).then(() => {
-          wx.showToast({ title: '已取消', icon: 'success' });
           this.load(true);
         });
       }
     });
   },
 
-  /** ✅ 修复：Promise.all 并行加载，错误兜底保证 hideLoading */
+  /* 表单校验 */
+  _validate() {
+    const result = validate('schedule', {
+      form: this.data.form,
+      students: this.data.students,
+      courses: this.data.courses
+    });
+    this.setData({ errors: result.errors, formValid: result.formValid });
+  },
+
   showAdd() {
-    wx.showLoading({ title: '加载中' });
     Promise.all([
       app.api('/api/students?status=active'),
       app.api('/api/courses'),
@@ -109,6 +126,7 @@ Page({
         enrollments: e.data || [],
         studentNames: students.map((x) => x.name),
         courseNames: courses.map((x) => x.name),
+        errors: {}, formValid: false, editingId: null,
         form: { studentIdx: 0, courseIdx: 0, schedule_date: ds, start_time: '', end_time: '', hours: 1, notes: '' }
       });
     }).catch(() => {
@@ -117,9 +135,14 @@ Page({
     });
   },
 
-  /** ✅ 修复：使用 setData 路径更新，不直接修改 data */
   onFormChange(e) {
-    this.setData({ [`form.${e.currentTarget.dataset.field}`]: e.detail.value });
+    const field = e.currentTarget.dataset.field;
+    if (field) { this.setData({ [`form.${field}`]: e.detail.value }); this._validate(); }
+  },
+
+  onFieldInput(e) {
+    const field = e.currentTarget.dataset.field;
+    if (field) { this.setData({ [`form.${field}`]: e.detail.value }); this._validate(); }
   },
 
   onStudentChange(e) {
@@ -129,7 +152,6 @@ Page({
     const enrollments = this.data.enrollments || [];
     const es = enrollments.filter((en) => en.student_id === sid);
 
-    // 学生只关联一门课 → 自动选中
     let courseIdx = this.data.form.courseIdx;
     if (es.length === 1) {
       const cid = es[0].course_id;
@@ -141,32 +163,30 @@ Page({
       'form.studentIdx': idx,
       'form.courseIdx': courseIdx
     });
+    this._validate();
   },
 
   onCourseChange(e) {
     this.setData({ 'form.courseIdx': parseInt(e.detail.value) });
-  },
-
-  saveSchedule(e) {
-    if (e.detail.index !== 1) { this.setData({ showForm: false }); return; }
-    this._doSaveSchedule();
+    this._validate();
   },
 
   closeForm() {
     this.setData({ showForm: false });
   },
 
-  /** 提交排课（替代原 mp-dialog 的 bindbuttontap） */
   submitSchedule() {
+    this._validate();
+    if (!this.data.formValid) return;
+    this.setData({ submitting: true });
     this._doSaveSchedule();
   },
 
   _doSaveSchedule() {
-    const { form, students, courses } = this.data;
+    const { form, students, courses, editingId } = this.data;
     const sid = students[form.studentIdx] ? students[form.studentIdx].id : 0;
     const cid = courses[form.courseIdx] ? courses[form.courseIdx].id : 0;
-    if (!sid || !cid) { wx.showToast({ title: '请选择学生和课程', icon: 'none' }); return; }
-    if (!form.schedule_date) { wx.showToast({ title: '请选择日期', icon: 'none' }); return; }
+    const isEdit = !!editingId;
 
     const body = JSON.stringify({
       student_id: sid, course_id: cid,
@@ -175,13 +195,95 @@ Page({
       notes: form.notes
     });
 
-    app.api('/api/schedules', { method: 'POST', body }).then((res) => {
+    const url = isEdit ? `/api/schedules/${editingId}` : '/api/schedules';
+    const method = isEdit ? 'PUT' : 'POST';
+
+    app.api(url, { method, body }).then((res) => {
+      this.setData({ submitting: false });
       if (res.code === 200) {
-        wx.showToast({ title: '排课成功', icon: 'success' });
-        this.setData({ showForm: false });
+        wx.showToast({ title: res.message || '已保存', icon: 'success' });
+        this.setData({ showForm: false, editingId: null });
         this.load(true);
-      } else {
-        wx.showToast({ title: res.message, icon: 'none' });
+      }
+    }).catch(() => {
+      this.setData({ submitting: false });
+    });
+  },
+
+  /* ======== 排课编辑 F1 ======== */
+  showEdit(e) {
+    const item = e.currentTarget.dataset.schedule;
+    Promise.all([
+      app.api('/api/students?status=active'),
+      app.api('/api/courses'),
+      app.api('/api/enrollments?status=active')
+    ]).then(([s, c, e]) => {
+      wx.hideLoading();
+      const students = (s.data || []).filter((x) => x.status !== 'inactive');
+      const courses = (c.data || []).filter((x) => x.status !== 'inactive');
+      const studentIdx = students.findIndex((x) => x.id === item.student_id);
+      const courseIdx = courses.findIndex((x) => x.id === item.course_id);
+      this.setData({
+        showForm: true, editingId: item.id,
+        students, courses,
+        enrollments: e.data || [],
+        studentNames: students.map((x) => x.name),
+        courseNames: courses.map((x) => x.name),
+        errors: {}, formValid: true,
+        form: {
+          studentIdx: Math.max(studentIdx, 0),
+          courseIdx: Math.max(courseIdx, 0),
+          schedule_date: item.schedule_date || '',
+          start_time: item.start_time || '',
+          end_time: item.end_time || '',
+          hours: item.hours || 1,
+          notes: item.notes || ''
+        }
+      });
+    }).catch(() => {
+      wx.hideLoading();
+      wx.showToast({ title: '加载失败', icon: 'none' });
+    });
+  },
+
+  /* ======== 批量签到 F2 ======== */
+  toggleBatchMode() {
+    this.setData({ batchMode: !this.data.batchMode, checkedIds: [] });
+  },
+
+  onCheckToggle(e) {
+    const id = e.currentTarget.dataset.id;
+    const ids = this.data.checkedIds.slice();
+    const idx = ids.indexOf(id);
+    if (idx > -1) ids.splice(idx, 1);
+    else ids.push(id);
+    this.setData({ checkedIds: ids });
+  },
+
+  selectAll() {
+    const all = this.data.list.filter((x) => x.status === 'scheduled').map((x) => x.id);
+    this.setData({ checkedIds: all });
+  },
+
+  batchCheckin() {
+    const { checkedIds } = this.data;
+    if (!checkedIds.length) { wx.showToast({ title: '请选择排课', icon: 'none' }); return; }
+    wx.showModal({
+      title: '批量签到',
+      content: `确认对 ${checkedIds.length} 节排课签到消课？`,
+      success: (r) => {
+        if (!r.confirm) return;
+        this.setData({ batchSubmitting: true });
+        app.api('/api/records/batch-checkin', {
+          method: 'POST',
+          body: JSON.stringify({ schedule_ids: checkedIds })
+        }).then((res) => {
+          wx.showToast({ title: res.message || '完成', icon: res.code === 200 ? 'success' : 'none' });
+          this.setData({ batchMode: false, checkedIds: [], batchSubmitting: false });
+          this.load(true);
+        }).catch(() => {
+          this.setData({ batchSubmitting: false });
+        });
       }
     });
   },
@@ -194,8 +296,6 @@ Page({
       success: (r) => {
         if (!r.confirm) return;
         app.api(`/api/schedules/${s.id}`, { method: 'DELETE' }).then((res) => {
-          if (res.code === 200) { wx.showToast({ title: '已删除', icon: 'success' }); this.load(true); }
-          else wx.showToast({ title: res.message, icon: 'none' });
         });
       }
     });
@@ -203,3 +303,4 @@ Page({
 
   noop() {}
 });
+

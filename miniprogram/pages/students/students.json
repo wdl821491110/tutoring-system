@@ -1,1 +1,9 @@
-{"enablePullDownRefresh":true}
+{
+  "enablePullDownRefresh": true,
+  "usingComponents": {
+    "mp-icon": "weui-miniprogram/icon/icon",
+    "mp-searchbar": "weui-miniprogram/searchbar/searchbar",
+    "mp-slideview": "weui-miniprogram/slideview/slideview",
+    "form-sheet": "/components/form-sheet/form-sheet"
+  }
+}

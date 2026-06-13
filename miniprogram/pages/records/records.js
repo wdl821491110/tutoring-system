@@ -1,21 +1,38 @@
 const app = getApp();
-
+const { validate } = require('../../utils/validator');
+const { getFirstLetter } = require('../../utils/pinyin');
 Page({
+
   data: {
     isAdmin: false,
-    list: [], loading: true,
+    list: [], loading: true, alphaList: [],
     page: 1, totalPages: 1, total: 0,
+    viewMode: 'date',
+    pickDate: '',
     dateFrom: '', dateTo: '',
-    showForm: false, showNotes: false,
+    showForm: false, showNotes: false, submitting: false,
     noteRecordId: 0, notes: [], newNoteContent: '',
     students: [], courses: [], enrollments: [],
     studentNames: [], courseNames: [],
-    form: { studentIdx: 0, courseIdx: 0, record_date: '', hours_consumed: 1, attendance: 'present', notes: '' }
+    form: { studentIdx: 0, courseIdx: 0, record_date: '', hours_consumed: 1, attendance: 'present', notes: '' },
+    errors: {},
+    formValid: false,
+    expandedMap: {},
+
+    noteButtons: [
+      { type: 'default', text: '关闭' },
+      { type: 'primary', text: '添加' }
+    ]
   },
 
   onShow() {
     if (!app.globalData.token) { wx.reLaunch({ url: '/pages/login/login' }); return; }
     this.setData({ isAdmin: app.isAdmin() });
+    if (!this.data.pickDate) {
+      const d = new Date();
+      const today = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+      this.setData({ pickDate: today, dateFrom: today, dateTo: today });
+    }
     this.load();
   },
 
@@ -23,9 +40,8 @@ Page({
     this.load(this.data.page, true).then(() => wx.stopPullDownRefresh());
   },
 
-  load(p, force) {
+  load(p, force, limit) {
     p = p || this.data.page;
-    // cache only page 1, 30s
     if (!force && p === 1 && this._cache && Date.now() - this._cache.time < 30000) {
       const c = this._cache;
       this.setData({ list: c.list, page: c.page, totalPages: c.totalPages, total: c.total, loading: false });
@@ -33,7 +49,8 @@ Page({
     }
     this.setData({ loading: true });
 
-    let url = `/api/records?page=${p}&per_page=20`;
+    const perPage = (limit && limit > 0) ? limit : 20;
+    let url = `/api/records?page=${p}&per_page=${perPage}`;
     if (this.data.dateFrom) url += `&date_from=${this.data.dateFrom}`;
     if (this.data.dateTo) url += `&date_to=${this.data.dateTo}`;
 
@@ -46,20 +63,96 @@ Page({
         this._cache = { time: Date.now(), list, page: pageVal, totalPages, total };
       }
       this.setData({ list, page: pageVal, totalPages, total, loading: false });
+      this._buildAlphaList(list);
     }).catch(() => {
       this.setData({ loading: false });
     });
   },
 
-  onDateFrom(e) { this.setData({ dateFrom: e.detail }); this.load(1, true); },
-  onDateTo(e) { this.setData({ dateTo: e.detail }); this.load(1, true); },
+  _buildAlphaList(list) {
+    const map = {};
+    (list || []).forEach(r => {
+      const name = r.student_name || '鏈煡';
+      const letter = getFirstLetter(name);
+      if (!map[name]) map[name] = { name, letter, records: [], total_hours: 0 };
+      map[name].records.push(r);
+      map[name].total_hours += r.hours_consumed || 0;
+    });
+    const alphaMap = {};
+    Object.values(map).forEach(stu => {
+      const l = stu.letter;
+      if (!alphaMap[l]) alphaMap[l] = [];
+      alphaMap[l].push(stu);
+    });
+    const sorted = Object.keys(alphaMap).sort().map(l => ({
+      letter: l,
+      students: alphaMap[l].sort((a, b) => a.name.localeCompare(b.name, 'zh'))
+    }));
+    this.setData({ alphaList: sorted });
+  },
+
+  switchView(e) {
+    const mode = e.currentTarget.dataset.mode;
+    this.setData({ viewMode: mode, expandedMap: {} });
+    if (mode === 'student') {
+      this.setData({ dateFrom: '', dateTo: '', page: 1 });
+      this._cache = null;
+      // 学生模式按字母分页，每页 50 条
+      this.load(1, true, 50);
+    } else {
+      const d = new Date();
+      const today = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+      this.setData({ pickDate: today, dateFrom: today, dateTo: today, page: 1 });
+      this._cache = null;
+      this.load(1, true);
+    }
+  },
+
+  toggleExpand(e) {
+    const name = e.currentTarget.dataset.name;
+    const expandedMap = { ...this.data.expandedMap };
+    expandedMap[name] = !expandedMap[name];
+    this.setData({ expandedMap });
+  },
+
+  onPickDate(e) {
+    const val = e.detail.value;
+    this.setData({ pickDate: val, dateFrom: val, dateTo: val, page: 1 });
+    this._cache = null;
+    this.load(1, true);
+  },
+
+  filterToday() {
+    const d = new Date();
+    const today = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+    this.setData({ pickDate: today, dateFrom: today, dateTo: today, page: 1 });
+    this._cache = null;
+    this.load(1, true);
+  },
 
   prevPage() { if (this.data.page > 1) this.load(this.data.page - 1); },
   nextPage() { if (this.data.page < this.data.totalPages) this.load(this.data.page + 1); },
 
-  /** ✅ Promise.all 并行加载 + 错误兜底 */
+  _validate() {
+    const f = this.data.form;
+    const s = this.data.students;
+    const c = this.data.courses;
+    const errors = {};
+    if (!s[f.studentIdx]) errors.student = true;
+    if (!c[f.courseIdx]) errors.course = true;
+    this.setData({ errors, formValid: Object.keys(errors).length === 0 });
+  },
+
+  closeForm() { this.setData({ showForm: false }); },
+
+  submitRecord() {
+    this._validate();
+    if (!this.data.formValid) return;
+    this.setData({ submitting: true });
+    this._submitRecord();
+  },
+
   showAdd() {
-    wx.showLoading({ title: '加载中' });
     Promise.all([
       app.api('/api/students?status=active'),
       app.api('/api/courses'),
@@ -76,6 +169,7 @@ Page({
         enrollments: e.data || [],
         studentNames: students.map((x) => x.name),
         courseNames: courses.map((x) => x.name),
+        errors: {}, formValid: false,
         form: { studentIdx: 0, courseIdx: 0, record_date: ds, hours_consumed: 1, attendance: 'present', notes: '' }
       });
     }).catch(() => {
@@ -84,9 +178,21 @@ Page({
     });
   },
 
-  /** ✅ 路径更新 */
   onFieldChange(e) {
-    this.setData({ [`form.${e.currentTarget.dataset.field}`]: e.detail.value });
+    const field = e.currentTarget.dataset.field;
+    if (!field) return;
+    this.setData({ [`form.${field}`]: e.detail.value });
+    this._validate();
+  },
+
+  onRadioChange(e) {
+    this.setData({ 'form.attendance': e.detail.value });
+    this._validate();
+  },
+
+  onFormDateChange(e) {
+    this.setData({ 'form.record_date': e.detail.value });
+    this._validate();
   },
 
   onStudentChange(e) {
@@ -103,21 +209,19 @@ Page({
     }
 
     this.setData({ 'form.studentIdx': idx, 'form.courseIdx': courseIdx });
+    this._validate();
   },
 
   onCourseChange(e) {
     this.setData({ 'form.courseIdx': parseInt(e.detail.value) });
+    this._validate();
   },
 
-  closeForm() { this.setData({ showForm: false }); },
-
-  /** 提交消课记录 */
-  submitRecord() {
+  _submitRecord() {
+    if (this.data.submitting) return;
     const { form, students, courses } = this.data;
     const sid = students[form.studentIdx] ? students[form.studentIdx].id : 0;
     const cid = courses[form.courseIdx] ? courses[form.courseIdx].id : 0;
-    if (!sid || !cid) { wx.showToast({ title: '请选择学生和课程', icon: 'none' }); return; }
-
     const body = JSON.stringify({
       student_id: sid, course_id: cid, record_date: form.record_date,
       hours_consumed: parseInt(form.hours_consumed) || 1,
@@ -125,6 +229,7 @@ Page({
     });
 
     app.api('/api/records', { method: 'POST', body }).then((res) => {
+      this.setData({ submitting: false });
       if (res.code === 200) {
         wx.showToast({ title: '消课成功', icon: 'success' });
         this.setData({ showForm: false });
@@ -132,6 +237,9 @@ Page({
       } else {
         wx.showToast({ title: res.message, icon: 'none' });
       }
+    }).catch(() => {
+      this.setData({ submitting: false });
+      wx.showToast({ title: '网络错误', icon: 'none' });
     });
   },
 
@@ -139,7 +247,7 @@ Page({
     const rid = e.currentTarget.dataset.rid;
     wx.showModal({
       title: '撤销记录',
-      content: '确定撤销该消课记录吗？',
+      content: '确定撤销该签到记录吗？',
       success: (r) => {
         if (!r.confirm) return;
         app.api(`/api/records/${rid}`, { method: 'DELETE' }).then((res) => {
@@ -148,6 +256,11 @@ Page({
         });
       }
     });
+  },
+
+  onNoteButtonTap(e) {
+    if (e.detail.index === 0) { this.setData({ showNotes: false }); }
+    else { this._addNote(); }
   },
 
   showNotes(e) {
@@ -161,20 +274,16 @@ Page({
     this.setData({ newNoteContent: e.detail.value });
   },
 
-  closeNotes() { this.setData({ showNotes: false }); },
-
-  /** 添加备注（替代原 mp-dialog 的 bindbuttontap） */
-  addNote() {
+  _addNote() {
     const content = this.data.newNoteContent.trim();
-    if (!content) { wx.showToast({ title: '请输入内容', icon: 'none' }); return; }
+    if (!content) return wx.showToast({ title: '请输入备注内容', icon: 'none' });
 
     app.api(`/api/records/${this.data.noteRecordId}/notes`, {
       method: 'POST',
       body: JSON.stringify({ content })
     }).then((res) => {
       if (res.code === 200) {
-        wx.showToast({ title: '已添加', icon: 'success' });
-        // 重新拉取备注 + 刷新列表
+wx.showToast({ title: '已添加', icon: 'success' });
         this.showNotes({ currentTarget: { dataset: { rid: this.data.noteRecordId } } });
         this.load(1, true);
       } else {
@@ -183,5 +292,27 @@ Page({
     });
   },
 
+  /* 删除备注 F5 */
+  deleteNote(e) {
+    const nid = e.currentTarget.dataset.nid;
+    wx.showModal({
+      title: '删除备注',
+      content: '确定删除该备注？',
+      success: (r) => {
+        if (!r.confirm) return;
+        app.api(`/api/records/${this.data.noteRecordId}/notes/${nid}`, { method: 'DELETE' }).then((res) => {
+          if (res.code === 200) {
+            wx.showToast({ title: '已删除', icon: 'success' });
+            this.showNotes({ currentTarget: { dataset: { rid: this.data.noteRecordId } } });
+          } else {
+            wx.showToast({ title: res.message, icon: 'none' });
+          }
+        });
+      }
+    });
+  },
+
   noop() {}
 });
+
+

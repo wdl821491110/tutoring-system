@@ -1,75 +1,97 @@
 <view class="page-container">
-  <!-- 骨架屏 -->
-  <view wx:if="{{loading}}" class="fade-in">
-    <view class="skeleton" style="height:120px;border-radius:14px;margin-bottom:16px;"></view>
-    <view class="skeleton" style="height:80px;border-radius:14px;margin-bottom:16px;"></view>
-    <view class="skeleton" style="height:100px;border-radius:14px;margin-bottom:16px;"></view>
+  <!-- ====== 骨架屏 ====== -->
+  <view wx:if="{{loading}}" class="fade-in" style="flex:1;overflow-y:auto;padding:0 8px;">
+    <view class="skeleton skeleton-hero"></view>
+    <view class="skeleton skeleton-block"></view>
+    <view class="skeleton skeleton-panel"></view>
   </view>
 
-  <!-- 内容 -->
-  <view wx:else class="fade-in">
-    <!-- 用户信息卡片 -->
-    <view class="profile-hero card" style="text-align:center;padding-top:24px;padding-bottom:24px;">
-      <view class="profile-avatar">{{user.real_name?user.real_name[0]:'?'}}</view>
-      <view class="profile-name">{{user.real_name||user.username}}</view>
-      <view class="tag {{user.role==='admin'?'tag--green':user.role==='teacher'?'tag--blue':'tag--gold'}}" style="margin-top:6px;">
-        {{user.role==='admin'?'管理员':user.role==='teacher'?'教师':'家长'}}
-      </view>
-    </view>
-
-    <!-- 账号信息 -->
-    <view class="card" style="padding:0;overflow:hidden;">
-      <view class="section-title" style="padding:14px 16px 0;">账号信息</view>
-      <view class="profile-cell">
-        <text class="profile-cell-key">用户名</text>
-        <text class="profile-cell-val">{{user.username}}</text>
-      </view>
-      <view class="profile-cell">
-        <text class="profile-cell-key">角色</text>
-        <text class="profile-cell-val"> {{user.role==='admin'?'管理员':user.role==='teacher'?'教师':'家长'}}</text>
-      </view>
-    </view>
-
-    <!-- 数据管理 -->
-    <view wx:if="{{isAdmin}}" class="card" style="padding:0;overflow:hidden;">
-      <view class="section-title" style="padding:14px 16px 0;">数据管理</view>
-      <view class="profile-cell profile-cell--link" bindtap="downloadBackup">
-        <view>
-          <text class="profile-cell-key" style="display:block;">下载备份</text>
-          <text class="text-xs text-gray" style="display:block;margin-top:2px;">导出完整数据</text>
+  <!-- ====== 内容 ====== -->
+  <block wx:else>
+    <!-- 固定顶部 — 用户信息区 -->
+    <view class="sticky-top">
+      <view class="profile-hero">
+        <view class="profile-avatar-wrap" hover-class="hover-active" bindtap="chooseAvatar">
+          <image wx:if="{{avatarUrl}}" class="profile-avatar-img" src="{{avatarUrl}}" mode="aspectFill"/>
+          <view wx:else class="profile-avatar">{{user.real_name?user.real_name[0]:'?'}}</view>
+          <view class="profile-avatar-badge">
+            <text style="font-size:12px;line-height:1;">📷</text>
+          </view>
         </view>
-        <view class="profile-cell-arrow">›</view>
+        <view class="profile-name">{{user.real_name||user.username}}</view>
+        <view class="tag tag--gray">{{user.role==='admin'?'管理员':user.role==='teacher'?'教师':'家长'}}</view>
       </view>
     </view>
 
-    <!-- 权限 -->
-    <view wx:if="{{userPerms}}" class="card" style="padding:0;overflow:hidden;">
-      <view class="section-title" style="padding:14px 16px 0;">我的权限</view>
-      <view class="profile-cell">
-        <text class="profile-cell-key">排课管理</text>
-        <text class="profile-cell-val {{userPerms.can_create_schedules?'text-green':'text-gray'}}">
-          {{userPerms.can_create_schedules?'✓ 已授权':'✗ 未授权'}}
-        </text>
+    <!-- 可滚动内容区 -->
+    <scroll-view class="scroll-body" scroll-y enhanced show-scrollbar="{{false}}">
+      <!-- 账号信息 -->
+      <view class="profile-panel">
+        <view class="weui-cells__title">账号信息</view>
+        <view class="weui-cells">
+          <view class="weui-cell">
+            <view class="weui-cell__bd"><text>用户名</text></view>
+            <view class="weui-cell__ft">{{user.username}}</view>
+          </view>
+          <view class="weui-cell">
+            <view class="weui-cell__bd"><text>角色</text></view>
+            <view class="weui-cell__ft">{{user.role==='admin'?'管理员':user.role==='teacher'?'教师':'家长'}}</view>
+          </view>
+        </view>
       </view>
-      <view class="profile-cell">
-        <text class="profile-cell-key">签到操作</text>
-        <text class="profile-cell-val {{userPerms.can_checkin?'text-green':'text-gray'}}">
-          {{userPerms.can_checkin?'✓ 已授权':'✗ 未授权'}}
-        </text>
-      </view>
-      <view class="profile-cell">
-        <text class="profile-cell-key">备份管理</text>
-        <text class="profile-cell-val {{userPerms.can_backup?'text-green':'text-gray'}}">
-          {{userPerms.can_backup?'✓ 已授权':'✗ 未授权'}}
-        </text>
-      </view>
-    </view>
 
-    <!-- 底部操作 -->
-    <view style="margin-top:32px;text-align:center;">
-      <view class="text-sm text-green mb-12" bindtap="goPrivacy">隐私政策</view>
-      <button class="logout-btn" bindtap="doLogout">退出登录</button>
-      <view class="text-xs" style="color:#C7C7CC;margin-top:16px;">课消管理系统 v4.0</view>
-    </view>
-  </view>
+      <!-- 数据管理 -->
+      <block wx:if="{{isAdmin}}">
+        <view class="profile-panel">
+          <view class="weui-cells__title">数据管理</view>
+          <view class="weui-cells">
+            <view class="weui-cell weui-cell_access" hover-class="weui-cell_active" bindtap="downloadBackup">
+              <view class="weui-cell__bd"><text>下载备份</text></view>
+              <view class="weui-cell__ft">导出完整数据</view>
+            </view>
+          </view>
+        </view>
+      </block>
+
+      <!-- 权限 -->
+      <block wx:if="{{userPerms}}">
+        <view class="profile-panel">
+          <view class="weui-cells__title">我的权限</view>
+          <view class="weui-cells">
+            <view class="weui-cell">
+              <view class="weui-cell__bd"><text>排课管理</text></view>
+              <view class="weui-cell__ft {{userPerms.can_create_schedules?'text-green':'text-red'}}">{{userPerms.can_create_schedules?'✓ 已授权':'✗ 未授权'}}</view>
+            </view>
+            <view class="weui-cell">
+              <view class="weui-cell__bd"><text>签到操作</text></view>
+              <view class="weui-cell__ft {{userPerms.can_checkin?'text-green':'text-red'}}">{{userPerms.can_checkin?'✓ 已授权':'✗ 未授权'}}</view>
+            </view>
+            <view class="weui-cell">
+              <view class="weui-cell__bd"><text>备份管理</text></view>
+              <view class="weui-cell__ft {{userPerms.can_backup?'text-green':'text-red'}}">{{userPerms.can_backup?'✓ 已授权':'✗ 未授权'}}</view>
+            </view>
+          </view>
+        </view>
+      </block>
+
+      <!-- 其他 -->
+      <view class="profile-panel">
+        <view class="weui-cells__title">其他</view>
+        <view class="weui-cells">
+          <view class="weui-cell weui-cell_access" hover-class="weui-cell_active" bindtap="goPrivacy">
+            <view class="weui-cell__bd"><text>隐私政策</text></view>
+            <view class="weui-cell__ft weui-cell__ft_in-access"></view>
+          </view>
+        </view>
+      </view>
+
+      <!-- 底部操作 -->
+      <view class="profile-footer">
+        <view class="logout-wrap">
+          <button class="weui-btn weui-btn_warn" bindtap="doLogout">退出登录</button>
+        </view>
+        <view class="profile-version">课消管理系统 v4.0</view>
+      </view>
+    </scroll-view>
+  </block>
 </view>

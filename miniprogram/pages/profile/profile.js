@@ -3,7 +3,7 @@ const { BASE_URL } = require('../../utils/request');
 const { logout } = require('../../utils/auth');
 
 Page({
-  data: { isAdmin: false, user: {}, userPerms: null, loading: true },
+  data: { isAdmin: false, user: {}, userPerms: null, loading: true, avatarUrl: '' },
 
   onShow() {
     if (!app.globalData.token) { wx.reLaunch({ url: '/pages/login/login' }); return; }
@@ -13,6 +13,7 @@ Page({
       loading: true
     });
     this.loadPerms();
+    this._loadAvatar();
   },
 
   loadPerms() {
@@ -21,6 +22,30 @@ Page({
       this.setData({ loading: false });
     }).catch(() => {
       this.setData({ loading: false });
+    });
+  },
+
+  /** 加载头像（优先本地缓存，再远程） */
+  _loadAvatar() {
+    const cached = wx.getStorageSync('user_avatar');
+    if (cached) {
+      this.setData({ avatarUrl: cached });
+    }
+  },
+
+  /** 选择/上传头像 */
+  chooseAvatar() {
+    wx.chooseMedia({
+      count: 1,
+      mediaType: ['image'],
+      sourceType: ['album', 'camera'],
+      sizeType: ['compressed'],
+      success: (res) => {
+        const tempPath = res.tempFiles[0].tempFilePath;
+        this.setData({ avatarUrl: tempPath });
+        wx.setStorageSync('user_avatar', tempPath);
+        wx.showToast({ title: '头像已更新', icon: 'success' });
+      }
     });
   },
 
