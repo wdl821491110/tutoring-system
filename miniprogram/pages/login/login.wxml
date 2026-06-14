@@ -45,7 +45,7 @@
         />
       </view>
       <view class="weui-cell__ft">
-        <view class="login-input-toggle" bindtap="togglePassword">
+        <view class="login-input-toggle" catchtap="togglePassword">
           <text>{{passwordVisible ? '🙈' : '👁'}}</text>
         </view>
       </view>

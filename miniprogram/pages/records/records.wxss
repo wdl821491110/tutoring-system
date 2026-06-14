@@ -109,12 +109,15 @@
   justify-content: space-between;
   align-items: flex-start;
 }
+
+
+
 .record-hours-wrap {
   display: flex;
   align-items: center;
 }
 .record-title {
-  font-size: 17px;
+  font-size: 20px;
   color: var(--c-text);
   flex: 1;
   min-width: 0;
@@ -134,7 +137,7 @@
   margin-top: 8px;
 }
 .record-hours {
-  font-size: 17px;
+  font-size: 15px;
   color: var(--c-primary);
 }
 .record-remaining {

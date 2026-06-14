@@ -25,7 +25,7 @@
     </view>
 
     <!-- 标题栏 — 左右对称卡片（仅按日期模式） -->
-    <view wx:if="{{viewMode==='date' && list.length>0}}" class="record-header">
+    <view wx:if="{{viewMode==='date' && list.length>=0}}" class="record-header">
       <view class="record-header__card">
         <text class="record-header__title">课时记录 · {{total}}条</text>
       </view>
@@ -132,7 +132,7 @@
       </view>
   </scroll-view>
 
-  <!-- ====== 空状态 ====== -->
+  <!-- ====== 空状态 ====== --
   <view wx:if="{{!loading && ((viewMode==='date' && list.length===0) || (viewMode==='student' && alphaList.length===0))}}" style="flex:1;">
     <view class="empty-state">
       <view class="empty-icon">
@@ -145,6 +145,7 @@
       <button class="weui-btn weui-btn_primary" bindtap="showAdd"> 新增消课</button>
     </view>
   </view>
+  >
 
   <!-- 新增消课记录 — form-sheet -->
   <form-sheet

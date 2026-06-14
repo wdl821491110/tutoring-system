@@ -81,7 +81,7 @@
       <view class="empty-hint" wx:if="{{!search}}">点击下方按钮添加第一个学生</view>
     </view>
     <view wx:if="{{isAdmin && !search}}" class="fixed-bottom">
-      <button class="weui-btn weui-btn_primary" bindtap="showAdd">＋ 添加学生</button>
+      <button class="weui-btn weui-btn_primary" bindtap="showAdd"> 添加学生</button>
     </view>
   </view>
 

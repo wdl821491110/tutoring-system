@@ -16,13 +16,18 @@
           </view>
         </view>
       </view>
-      <view wx:if="{{isAdmin && list.length>0}}" class="top-bar__batch">
-        <text wx:if="{{!batchMode}}" class="schedule-batch-btn" hover-class="hover-active" bindtap="toggleBatchMode">批量签到</text>
+    </view>
+
+    <!-- 标题栏 — 按钮在上，标题在下 -->
+    <view wx:if="{{list.length>=0}}" class="schedule-header">
+      <view wx:if="{{isAdmin}}" class="schedule-header__actions">
+        <text wx:if="{{!batchMode}}" class="schedule-header__card schedule-header__batch-btn" bindtap="toggleBatchMode">批量签到</text>
         <block wx:else>
-          <text class="schedule-batch-btn" hover-class="hover-active" bindtap="selectAll">全选</text>
-          <text class="schedule-batch-btn schedule-batch-btn--green" hover-class="hover-active" bindtap="batchCheckin">签到({{checkedIds.length}})</text>
-          <text class="schedule-batch-btn schedule-batch-btn--gray" hover-class="hover-active" bindtap="toggleBatchMode">取消</text>
+          <text class="schedule-header__card schedule-header__batch-btn" bindtap="selectAll">全选</text>
+          <text class="schedule-header__card schedule-header__batch-btn schedule-header__batch-btn--green" bindtap="batchCheckin">签到({{checkedIds.length}})</text>
+          <text class="schedule-header__card schedule-header__batch-btn schedule-header__batch-btn--gray" bindtap="toggleBatchMode">取消</text>
         </block>
+        <button class="schedule-header__card schedule-header__add-btn" bindtap="showAdd"> 新增排课</button>
       </view>
     </view>
 
@@ -33,13 +38,8 @@
       <text class="filter-pill {{statusIdx===2?'filter-pill--active':''}}" hover-class="{{statusIdx===2?'':'hover-active'}}" bindtap="onStatusChange" data-idx="2">已完成</text>
       <text class="filter-pill {{statusIdx===3?'filter-pill--active':''}}" hover-class="{{statusIdx===3?'':'hover-active'}}" bindtap="onStatusChange" data-idx="3">已取消</text>
     </view>
-
-    <!-- 标题栏 — 左右对称卡片 -->
-    <view wx:if="{{list.length>0}}" class="schedule-header">
-      <view class="schedule-header__card">
-        <text class="schedule-header__title">排课列表 · {{list.length}}节</text>
-      </view>
-      <button wx:if="{{isAdmin}}" class="schedule-header__card schedule-header__add-btn" bindtap="showAdd"> 新增排课</button>
+    <view class="schedule-header__card">
+      <text class="schedule-header__title">排课列表 · {{list.length}}节</text>
     </view>
   </view>
 
@@ -86,7 +86,7 @@
       </view>
   </scroll-view>
 
-  <!-- ====== 空状态 ====== -->
+  <!-- ====== 空状态 ====== --
   <view wx:if="{{!loading && list.length===0}}" style="flex:1;">
     <view class="empty-state">
       <view class="empty-icon">
@@ -96,9 +96,10 @@
       <view class="empty-hint">{{dateFilter?'该日期暂未排课':'点击下方按钮开始排课'}}</view>
     </view>
     <view wx:if="{{isAdmin}}" class="fixed-bottom">
-      <button class="weui-btn weui-btn_primary" bindtap="showAdd">＋ 新增排课</button>
+      <button class="weui-btn weui-btn_primary" bindtap="showAdd"> 新增排课</button>
     </view>
   </view>
+  >
 
   <!-- 新增/编辑排课表单 — form-sheet -->
   <form-sheet
@@ -132,7 +133,7 @@
         <view class="weui-cell__hd"><view class="weui-label">日期</view></view>
         <view class="weui-cell__bd">
           <picker mode="date" value="{{form.schedule_date}}" bindchange="onFormChange" data-field="schedule_date">
-            <view>{{form.schedule_date||'选择日期'}}</view>
+            <view>{{form.schedule_date||'选择日期'}}{{form.schedule_weekday?' '+form.schedule_weekday:''}}</view>
           </picker>
         </view>
         <view class="weui-cell__ft weui-cell__ft_in-access"></view>

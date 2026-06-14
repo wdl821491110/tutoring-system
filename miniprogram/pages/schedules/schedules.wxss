@@ -60,28 +60,6 @@
   box-shadow: 0 1px 4px rgba(0,0,0,0.04);
 }
 
-/* ---------- 批量签到按钮 ---------- */
-.schedule-batch-btn {
-  display: inline-flex;
-  align-items: center;
-  height: 28px;
-  padding: 0 14px;
-  border-radius: 14px;
-  font-size: 13px;
-  white-space: nowrap;
-  color: var(--c-primary);
-  background: var(--c-primary-light);
-  font-weight: 500;
-}
-.schedule-batch-btn--green {
-  color: #fff;
-  background: var(--c-primary);
-}
-.schedule-batch-btn--gray {
-  color: var(--c-text-hint);
-  background: #F0F0F0;
-}
-
 /* 状态胶囊 — 两端对齐 */
 .filter-status {
   display: flex;
@@ -93,13 +71,43 @@
   padding: 0 18px;
 }
 
-/* ---------- 标题栏 — 左右对称卡片 ---------- */
+/* ---------- 标题栏 — 按钮上，标题下 ---------- */
 .schedule-header {
   display: flex;
-  justify-content: space-between;
+  flex-wrap: wrap;
+  padding: 4px 16px 12px;
+  gap: 8px;
+}
+.schedule-header__actions {
+  display: flex;
   align-items: center;
-  padding: 0 16px 12px;
-  gap: 12px;
+  gap: 8px;
+  flex-shrink: 0;
+  margin-left: auto;
+}
+
+/* 批量签到按钮 — 与新增排课同款卡片样式 */
+.schedule-header__batch-btn {
+  display: inline-flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  font-size: 16px !important;
+  font-weight: 500 !important;
+  line-height: 1 !important;
+  color: var(--c-primary) !important;
+  background: #F7F8FA !important;
+  border: none !important;
+  margin: 0 !important;
+  padding-left: 14px !important;
+  padding-right: 14px !important;
+}
+.schedule-header__batch-btn--green {
+  color: #fff !important;
+  background: var(--c-primary) !important;
+}
+.schedule-header__batch-btn--gray {
+  color: var(--c-text-hint) !important;
+  background: #F0F0F0 !important;
 }
 .schedule-header__card {
   background: #F7F8FA;
@@ -184,7 +192,7 @@
 
 /* ---------- 列表卡片统一圆角 ---------- */
 .schedule-list {
-  padding: 12px 0;
+  padding: 8px 0 12px;
   margin: 0 16px 16px;
 }
 
@@ -217,4 +225,28 @@
   font-size: 14px;
   color: var(--c-primary);
   background: #fff;
+}
+
+/* ---------- 空状态 ---------- */
+.empty-state {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  padding: 60px 20px;
+}
+.empty-text {
+  font-size: 16px;
+  color: var(--c-text-secondary);
+  margin-top: 16px;
+}
+.empty-hint {
+  font-size: 14px;
+  color: var(--c-text-hint);
+  margin-top: 8px;
+}
+.fixed-bottom {
+  padding: 16px;
+  padding-bottom: calc(16px + env(safe-area-inset-bottom));
 }

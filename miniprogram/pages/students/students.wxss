@@ -62,8 +62,8 @@
 
 /* ---------- 头像 — 灰度圆角 ---------- */
 .student-avatar {
-  width: 48px;
-  height: 48px;
+  width: 60px;
+  height: 60px;
   border-radius: 8px;
   background: #E8E8E8;
   color: #888;

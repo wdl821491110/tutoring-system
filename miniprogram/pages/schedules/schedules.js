@@ -120,6 +120,7 @@ Page({
       const courses = (c.data || []).filter((x) => x.status !== 'inactive');
       const d = new Date();
       const ds = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+      const wd = ['周日','周一','周二','周三','周四','周五','周六'][d.getDay()];
       this.setData({
         showForm: true,
         students, courses,
@@ -127,7 +128,7 @@ Page({
         studentNames: students.map((x) => x.name),
         courseNames: courses.map((x) => x.name),
         errors: {}, formValid: false, editingId: null,
-        form: { studentIdx: 0, courseIdx: 0, schedule_date: ds, start_time: '', end_time: '', hours: 1, notes: '' }
+        form: { studentIdx: 0, courseIdx: 0, schedule_date: ds, schedule_weekday: wd, start_time: '', end_time: '', hours: 1, notes: '' }
       });
     }).catch(() => {
       wx.hideLoading();
@@ -137,7 +138,18 @@ Page({
 
   onFormChange(e) {
     const field = e.currentTarget.dataset.field;
-    if (field) { this.setData({ [`form.${field}`]: e.detail.value }); this._validate(); }
+    if (field) {
+      const obj = { [`form.${field}`]: e.detail.value };
+      if (field === 'schedule_date') obj['form.schedule_weekday'] = this._weekday(e.detail.value);
+      this.setData(obj);
+      this._validate();
+    }
+  },
+
+  _weekday(dateStr) {
+    if (!dateStr) return '';
+    const w = new Date(dateStr.replace(/-/g, '/')).getDay();
+    return ['周日','周一','周二','周三','周四','周五','周六'][w];
   },
 
   onFieldInput(e) {
@@ -223,6 +235,16 @@ Page({
       const courses = (c.data || []).filter((x) => x.status !== 'inactive');
       const studentIdx = students.findIndex((x) => x.id === item.student_id);
       const courseIdx = courses.findIndex((x) => x.id === item.course_id);
+      const form = {
+          studentIdx: Math.max(studentIdx, 0),
+          courseIdx: Math.max(courseIdx, 0),
+          schedule_date: item.schedule_date || '',
+          schedule_weekday: item.schedule_date ? this._weekday(item.schedule_date) : '',
+          start_time: item.start_time || '',
+          end_time: item.end_time || '',
+          hours: item.hours || 1,
+          notes: item.notes || ''
+        };
       this.setData({
         showForm: true, editingId: item.id,
         students, courses,
@@ -230,15 +252,7 @@ Page({
         studentNames: students.map((x) => x.name),
         courseNames: courses.map((x) => x.name),
         errors: {}, formValid: true,
-        form: {
-          studentIdx: Math.max(studentIdx, 0),
-          courseIdx: Math.max(courseIdx, 0),
-          schedule_date: item.schedule_date || '',
-          start_time: item.start_time || '',
-          end_time: item.end_time || '',
-          hours: item.hours || 1,
-          notes: item.notes || ''
-        }
+        form
       });
     }).catch(() => {
       wx.hideLoading();
