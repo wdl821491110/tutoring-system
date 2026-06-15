@@ -638,8 +638,11 @@ def delete_user(uid):
 @app.route('/')
 
 def index():
+    # EXE 模式（非云端、非开发）：前端直连云托管共享数据库
+    # 开发模式（python run.py）：前端用本地 API
+    use_cloud_api = getattr(sys, 'frozen', False) and not IS_CLOUD
 
-    return render_template('index.html')
+    return render_template('index.html', use_cloud_api=use_cloud_api)
 
 # ==================== 仪表盘 ====================
 
@@ -671,7 +674,7 @@ def dashboard():
                 'total_students': 0, 'total_teachers': db.execute("SELECT COUNT(*) as c FROM teachers WHERE status='active'").fetchone()['c'],
                 'total_courses': db.execute("SELECT COUNT(*) as c FROM courses WHERE status='active'").fetchone()['c'],
                 'today_count': 0, 'today_consumed': 0, 'total_remaining': 0,
-                'today_schedules': [], 'daily_stats': [], 'course_details': []
+                'today_schedules': [], 'daily_stats': [], 'course_details': [], 'course_ranking': []
             })
     elif user and user['role'] == 'parent' and user.get('linked_student_id'):
         student_filter = " AND e.student_id = ?"
@@ -733,6 +736,26 @@ def dashboard():
         d['teacher_name'] = get_course_teacher_names(db, d['course_id'])
         details.append(d)
 
+    # 近30天课程消课排行
+    # teacher 角色按关联学生过滤消课记录
+    records_filter = ""
+    ranking_params = []
+    if user and user['role'] == 'teacher' and user.get('linked_teacher_id'):
+        sids = teacher_student_ids(db, user['linked_teacher_id'])
+        if sids:
+            placeholders = ','.join('?' * len(sids))
+            records_filter = f" AND cr.student_id IN ({placeholders})"
+            ranking_params = sids
+    course_ranking = db.execute(f"""
+        SELECT c.name, COALESCE(SUM(cr.hours_consumed), 0) as total_hours
+        FROM class_records cr
+        JOIN courses c ON cr.course_id = c.id
+        WHERE cr.record_date >= date('now', '-30 days', 'localtime'){records_filter}
+        GROUP BY cr.course_id
+        ORDER BY total_hours DESC
+        LIMIT 10
+    """, ranking_params).fetchall()
+
     return api_response(data={
 
         'total_students': total_students, 'total_teachers': total_teachers,
@@ -745,7 +768,9 @@ def dashboard():
 
         'daily_stats': [dict(r) for r in daily_stats],
 
-        'course_details': details
+        'course_details': details,
+
+        'course_ranking': [dict(r) for r in course_ranking]
 
     })
 
@@ -2224,8 +2249,26 @@ def backup_restore():
         if os.path.exists(restore_path):
             os.remove(restore_path)
         return api_error(f"验证失败: {str(e)}")
-    # 替换数据库
-    os.replace(restore_path, DB_PATH)
+    # 替换数据库（用 sqlite3.backup 写入，避免 Windows 文件占用错误）
+    try:
+        src2 = sqlite3.connect(restore_path)
+        dst2 = sqlite3.connect(DB_PATH)
+        src2.backup(dst2)
+        src2.close()
+        dst2.close()
+    except Exception as e:
+        if os.path.exists(restore_path):
+            try:
+                os.remove(restore_path)
+            except Exception:
+                pass
+        return api_error(f"恢复失败: {str(e)}", 500)
+    finally:
+        if os.path.exists(restore_path):
+            try:
+                os.remove(restore_path)
+            except Exception:
+                pass
 
     # 记录日志
     new_size = os.path.getsize(DB_PATH)
@@ -2293,7 +2336,11 @@ def cloud_sync():
 
     try:
 
-        from cloud_backup import upload_db
+        from cloud_backup import upload_db, _get_api_key
+
+        if not _get_api_key():
+
+            return api_error('未配置云端密钥，请在下方「云端配置」中填写 TCB_API_KEY', 400)
 
         db_path = os.path.join(get_data_dir(), 'tutoring.db')
 
@@ -2301,7 +2348,7 @@ def cloud_sync():
 
             return api_error('数据库文件不存在', 404)
 
-        success = upload_db(db_path)
+        success, msg = upload_db(db_path)
 
         if success:
 
@@ -2309,7 +2356,7 @@ def cloud_sync():
 
         else:
 
-            return api_error('云端备份失败，请检查TCB_API_KEY配置', 500)
+            return api_error(f'云端备份失败: {msg}', 500)
 
     except ImportError:
 
@@ -2319,45 +2366,180 @@ def cloud_sync():
 
         return api_error(str(e), 500)
 
+# ==================== 云端配置 ====================
+
+@app.route('/api/config/cloud', methods=['GET'])
+
+@require_auth(['admin'])
+
+def get_cloud_config():
+    """获取云端配置（API Key 脱敏显示）"""
+    from cloud_backup import _get_api_key, _get_env_id
+    api_key = _get_api_key()
+    env_id = _get_env_id()
+    # 脱敏：只显示前4位和后4位
+    masked_key = ''
+    if api_key:
+        if len(api_key) > 8:
+            masked_key = api_key[:4] + '****' + api_key[-4:]
+        else:
+            masked_key = '****'
+    return api_response(data={'api_key_masked': masked_key, 'api_key_set': bool(api_key), 'env_id': env_id})
+
+
+@app.route('/api/config/cloud', methods=['POST'])
+
+@require_auth(['admin'])
+
+def save_cloud_config():
+    """保存云端配置"""
+    data = request.get_json() or {}
+    api_key = data.get('api_key', '').strip()
+    env_id = data.get('env_id', '').strip()
+    db = g.db
+    if api_key:
+        db.execute("INSERT OR REPLACE INTO system_config (key, value, updated_at) VALUES ('tcb_api_key', ?, datetime('now','localtime'))", (api_key,))
+    elif data.get('clear_api_key'):
+        db.execute("DELETE FROM system_config WHERE key = 'tcb_api_key'")
+    if env_id:
+        db.execute("INSERT OR REPLACE INTO system_config (key, value, updated_at) VALUES ('tcb_env_id', ?, datetime('now','localtime'))", (env_id,))
+    db.commit()
+    return api_response(message='云端配置已保存')
+
+
+@app.route('/api/config/cloud/test', methods=['POST'])
+
+@require_auth(['admin'])
+
+def test_cloud_config():
+    """测试云端连接（尝试获取上传凭证）"""
+    import requests as req
+    from cloud_backup import _get_api_key, _get_env_id
+    api_key = _get_api_key()
+    if not api_key:
+        return api_error('未配置 TCB_API_KEY', 400)
+    env_id = _get_env_id()
+    gateway = f'https://{env_id}.api.tcloudbasegateway.com'
+    try:
+        resp = req.post(
+            f'{gateway}/v1/storages/get-objects-upload-info',
+            headers={'Content-Type': 'application/json', 'Authorization': f'Bearer {api_key}'},
+            json=[{'objectId': 'backup/tutoring.db'}],
+            timeout=10
+        )
+        if resp.status_code == 200:
+            result = resp.json()
+            if isinstance(result, list) and len(result) > 0 and 'code' not in result[0]:
+                return api_response(message='云端连接成功')
+            else:
+                msg = result[0].get('message', '未知错误') if isinstance(result, list) and len(result) > 0 else '响应异常'
+                return api_error(f'认证失败: {msg}', 400)
+        else:
+            return api_error(f'连接失败: HTTP {resp.status_code}', 400)
+    except Exception as e:
+        return api_error(f'连接异常: {str(e)}', 500)
+
+
+@app.route('/api/config/cloud/key', methods=['DELETE'])
+
+@require_auth(['admin'])
+
+def clear_cloud_api_key():
+    """清除已保存的 API Key（不删除环境 ID）"""
+    db = g.db
+    db.execute("DELETE FROM system_config WHERE key = 'tcb_api_key'")
+    db.commit()
+    return api_response(message='云端密钥已清除')
 @app.route('/api/backup/cloud-restore', methods=['POST'])
 @require_auth(['admin'])
 def cloud_restore():
     """从云存储恢复数据库"""
     import sqlite3
     try:
-        from cloud_backup import download_db
+        from cloud_backup import download_db, _get_api_key
+
+        # 先检查 API Key 是否可用
+        api_key = _get_api_key()
+        if not api_key:
+            return api_error('未配置云端密钥，请在下方「云端配置」中填写 TCB_API_KEY', 400)
+
         timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
         restore_path = os.path.join(get_data_dir(), f'cloud_restore_{timestamp}.db')
-        success = download_db(restore_path)
+        success, msg = download_db(restore_path)
         if not success:
-            return api_error('云端无可用备份，请先执行云端备份（同步到云端）', 404)
+            return api_error(f'云端恢复失败: {msg}', 404)
+
+        # 验证恢复文件完整性
+        test_conn = None
         try:
-            test = sqlite3.connect(restore_path)
-            tables = test.execute("SELECT name FROM sqlite_master WHERE type='table'").fetchall()
+            test_conn = sqlite3.connect(restore_path)
+            tables = test_conn.execute("SELECT name FROM sqlite_master WHERE type='table'").fetchall()
             table_names = [t['name'] if isinstance(t, sqlite3.Row) else t[0] for t in tables]
-            test.close()
             if 'students' not in table_names or 'courses' not in table_names:
+                test_conn.close()
                 os.remove(restore_path)
                 return api_error('云端备份文件不完整，缺少必要表', 500)
-        except Exception:
-            os.remove(restore_path)
-            return api_error('云端备份文件损坏，无法读取', 500)
+        except Exception as ve:
+            if test_conn:
+                test_conn.close()
+            if os.path.exists(restore_path):
+                os.remove(restore_path)
+            return api_error(f'云端备份文件验证失败: {ve}', 500)
+        finally:
+            if test_conn:
+                test_conn.close()
+
+        # 步骤 1：安全备份当前数据库（用独立连接，完成后立即关闭）
         safety_backup = os.path.join(get_data_dir(), f'auto_backup_before_cloud_restore_{timestamp}.db')
-        src = sqlite3.connect(DB_PATH)
-        dst = sqlite3.connect(safety_backup)
-        src.backup(dst)
-        src.close(); dst.close()
-        src2 = sqlite3.connect(restore_path)
-        dst2 = sqlite3.connect(DB_PATH)
-        src2.backup(dst2)
-        src2.close(); dst2.close()
-        os.remove(restore_path)
+        src = dst = None
+        try:
+            src = sqlite3.connect(DB_PATH)
+            dst = sqlite3.connect(safety_backup)
+            src.backup(dst)
+        except Exception as e:
+            return api_error(f'自动备份当前数据失败（数据库可能被占用）: {e}', 500)
+        finally:
+            if src: src.close()
+            if dst: dst.close()
+
+        # 步骤 2：将云端备份数据恢复到主数据库（sqlite3.backup 热写入）
+        src2 = dst2 = None
+        try:
+            src2 = sqlite3.connect(restore_path)
+            dst2 = sqlite3.connect(DB_PATH)
+            src2.backup(dst2)
+        except Exception as e:
+            # 恢复失败时，尝试回滚安全备份
+            try:
+                rollback_src = sqlite3.connect(safety_backup)
+                rollback_dst = sqlite3.connect(DB_PATH)
+                rollback_src.backup(rollback_dst)
+                rollback_src.close()
+                rollback_dst.close()
+            except Exception:
+                pass
+            return api_error(f'云端数据恢复失败: {e}', 500)
+        finally:
+            if src2: src2.close()
+            if dst2: dst2.close()
+
+        # 清理临时文件
+        if os.path.exists(restore_path):
+            try:
+                os.remove(restore_path)
+            except Exception:
+                pass
+
+        # 记录日志
         db = g.db
         db.execute("INSERT INTO backup_records (filename, file_size, created_at) VALUES (?, ?, datetime('now','localtime'))",
                    ('cloud_restore_' + timestamp + '.db', os.path.getsize(safety_backup)))
         db.commit()
+
         return api_response(message='云端恢复成功，系统将在刷新后使用新数据')
+
     except ImportError:
-        return api_error('缺少 requests 库，无法进行云端恢复', 500)
+        return api_error('缺少 requests 库或 cloud_backup 模块，无法进行云端恢复', 500)
     except Exception as e:
-        return api_error(str(e), 500)
+        logging.error(f'Cloud restore error: {e}', exc_info=True)
+        return api_error(f'云端恢复异常: {e}', 500)

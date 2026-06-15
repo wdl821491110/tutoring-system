@@ -47,7 +47,7 @@ def restore_from_cloud():
         import os as _os
         db_path = _os.path.join(get_data_dir(), 'tutoring.db')
         logger.info('尝试从云存储恢复数据库...')
-        success = download_db(db_path)
+        success, _ = download_db(db_path)
         if success:
             logger.info('数据库从云存储恢复成功')
             init_db()
@@ -66,7 +66,7 @@ def backup_to_cloud():
         import os as _os
         db_path = _os.path.join(get_data_dir(), 'tutoring.db')
         if _os.path.exists(db_path):
-            upload_db(db_path)
+            success, _ = upload_db(db_path)
     except ImportError:
         pass
     except Exception as e:

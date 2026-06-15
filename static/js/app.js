@@ -3,9 +3,18 @@
  * 新增：登录鉴权、角色控制、备份恢复、用户管理
  */
 // ==================== 全局状态 ====================
-// PC 端和小程序端直连 CloudBase CloudRun，共享同一套 API 和数据库
-// 小程序：使用 miniprogram/app.js 中的 BASE_URL 直连 CloudBase
-const API_BASE = 'https://tutoring-269057-7-1316430031.sh.run.tcloudbase.com';
+// 自动检测运行模式：本地开发用 localhost，EXE 和云端用公网域名共享数据库
+const API_BASE = (function() {
+    // 如果页面从公网域名加载（云端部署），用相对路径
+    if (location.hostname.includes('tcloudbase.com') || location.hostname.includes('run.tcloudbase.com')) {
+        return '';
+    }
+    // 本地开发模式：检查是否有 FORCE_CLOUD 标记（通过 URL 参数或模板变量）
+    if (window.__API_BASE__) return window.__API_BASE__;
+    if (location.search.includes('cloud=1')) return 'https://tutoring-269057-7-1316430031.sh.run.tcloudbase.com';
+    // 默认本地模式（python run.py 开发时）
+    return 'http://127.0.0.1:8899';
+})();
 const STATE = { currentPage: 'dashboard', students: [], teachers: [], courses: [], editingId: null, token: null, user: null };
 
 // ==================== 工具 ====================
@@ -55,9 +64,17 @@ async function api(url, options = {}) {
 function apiData(json) { return json.data !== undefined ? json.data : json; }
 
 function toast(msg, type = 'info') {
-    const c = $('#toastContainer'); const el = document.createElement('div');
-    el.className = `toast toast-${type}`; el.textContent = msg; c.appendChild(el);
-    setTimeout(() => { el.style.opacity = '0'; el.style.transition = 'opacity 0.3s'; }, 2500);
+    const c = $('#toastContainer');
+    const el = document.createElement('div');
+    const icons = { success: '✓', error: '✕', warning: '⚠', info: 'ℹ' };
+    el.className = `toast toast-${type}`;
+    el.innerHTML = `<span style="display:inline-flex;align-items:center;gap:8px;"><span style="font-weight:700;font-size:15px;">${icons[type]||'ℹ'}</span>${msg}</span><span class="toast-progress"></span>`;
+    c.appendChild(el);
+    setTimeout(() => {
+        el.style.opacity = '0';
+        el.style.transform = 'translateX(100%)';
+        el.style.transition = 'opacity 0.3s, transform 0.3s';
+    }, 2500);
     setTimeout(() => el.remove(), 2800);
 }
 
@@ -69,11 +86,19 @@ function isParent() { return STATE.user && STATE.user.role === 'parent'; }
 async function doLogin() {
     const u = $('#loginUsername').value.trim(), p = $('#loginPassword').value;
     if (!u || !p) { showLoginError('请输入用户名和密码'); return; }
+    const btn = $('#loginBtn');
+    btn.classList.add('loading');
     try {
         const json = await api('/api/auth/login', { method: 'POST',
             body: JSON.stringify({ username: u, password: p }) });
-        if (json.code !== 200) { showLoginError(json.message); return; }
+        if (json.code !== 200) { showLoginError(json.message); btn.classList.remove('loading'); return; }
         STATE.token = json.data.token; STATE.user = json.data.user;
+        // Remember me
+        if ($('#rememberMe').checked) {
+            localStorage.setItem('tutoring_remember_user', u);
+        } else {
+            localStorage.removeItem('tutoring_remember_user');
+        }
         localStorage.setItem('tutoring_token', STATE.token);
         localStorage.setItem('tutoring_user', JSON.stringify(STATE.user));
         localStorage.setItem('tutoring_login_time', Date.now().toString());
@@ -81,9 +106,8 @@ async function doLogin() {
         $('#mainApp').style.display = 'flex';
         updateUIByRole(); updateUserDisplay();
         switchPage('dashboard').catch(e => { toast('仪表盘加载失败: ' + e.message, 'error'); });
-    } catch (e) { showLoginError('登录失败: ' + e.message); }
+    } catch (e) { showLoginError('登录失败: ' + e.message); btn.classList.remove('loading'); }
 }
-
 function doLogout() {
     api('/api/auth/logout', { method: 'POST' }).catch(() => {});
     STATE.token = null; STATE.user = null;
@@ -94,6 +118,19 @@ function doLogout() {
 }
 
 function showLoginError(msg) { const el = $('#loginError'); el.textContent = msg; el.style.display = 'block'; }
+
+function togglePasswordVisibility() {
+    const pwd = document.getElementById('loginPassword');
+    const btn = document.getElementById('pwdToggleBtn');
+    if (pwd.type === 'password') {
+        pwd.type = 'text';
+        btn.textContent = '🙈';
+    } else {
+        pwd.type = 'password';
+        btn.textContent = '👁️';
+    }
+}
+
 
 
 
@@ -137,6 +174,13 @@ function updateUIByRole() {
 }
 
 function tryAutoLogin() {
+    // Restore remembered username
+    const rememberedUser = localStorage.getItem('tutoring_remember_user');
+    if (rememberedUser) {
+        $('#loginUsername').value = rememberedUser;
+        $('#rememberMe').checked = true;
+    }
+
     const tok = localStorage.getItem('tutoring_token'), usr = localStorage.getItem('tutoring_user');
     if (!tok || !usr) return;
     if (!checkIdleTimeout()) {
@@ -226,29 +270,48 @@ function showModal(title, bodyHtml, footerHtml = '', size = '') {
 function closeModal() { $('#modalContainer').innerHTML = ''; }
 
 // ==================== 仪表盘 ====================
+
 async function loadDashboard() {
     try {
         const d = apiData(await api('/api/dashboard'));
-        $('#dashboardStats').innerHTML = `
-            <div class="stat-card"><div class="stat-icon blue">👨‍🎓</div><div class="stat-info"><div class="stat-value">${d.total_students}</div><div class="stat-label">在读学生</div></div></div>
-            <div class="stat-card"><div class="stat-icon green">👩‍🏫</div><div class="stat-info"><div class="stat-value">${d.total_teachers}</div><div class="stat-label">在职教师</div></div></div>
-            <div class="stat-card"><div class="stat-icon purple">📖</div><div class="stat-info"><div class="stat-value">${d.total_courses}</div><div class="stat-label">开设课程</div></div></div>
-            <div class="stat-card"><div class="stat-icon orange">📅</div><div class="stat-info"><div class="stat-value">${d.today_count}</div><div class="stat-label">今日课程</div></div></div>
-            <div class="stat-card"><div class="stat-icon red">✅</div><div class="stat-info"><div class="stat-value">${d.today_consumed}</div><div class="stat-label">今日已消</div></div></div>
-            <div class="stat-card"><div class="stat-icon blue">⏳</div><div class="stat-info"><div class="stat-value">${d.total_remaining}</div><div class="stat-label">剩余课时</div></div></div>`;
+                // Show skeleton while loading
+        document.getElementById('dashboardStats').innerHTML = '<div class="stats-grid">' + Array(6).fill('<div class="skeleton skeleton-card"></div>').join('') + '</div>';
+        document.getElementById('weekChart').innerHTML = '<div class="chart-bars">' + Array(7).fill('<div class="skeleton" style="flex:1;height:100px;"></div>').join('') + '</div>';
+const cards = [
+            { icon: '👨‍🎓', value: d.total_students, label: '在读学生', cls: 'primary' },
+            { icon: '👩‍🏫', value: d.total_teachers, label: '在职教师', cls: 'success' },
+            { icon: '📖', value: d.total_courses, label: '开设课程', cls: 'warning' },
+            { icon: '📅', value: d.today_count, label: '今日课程', cls: 'info' },
+            { icon: '✅', value: d.today_consumed, label: '今日已消', cls: 'danger' },
+            { icon: '⏳', value: d.total_remaining, label: '剩余课时', cls: 'primary' }
+        ];
+        const container = document.getElementById('dashboardStats');
+        container._rawValues = cards.map(c => c.value);
+        container.innerHTML = cards.map(c => `
+            <div class="stat-card ${c.cls}">
+                <div class="stat-icon">${c.icon}</div>
+                <div><div class="stat-value" data-count="${c.value}">0</div>
+                <div class="stat-label">${c.label}</div></div>
+            </div>
+        `).join('');
+        animateStatNumbers();
 
         const maxVal = Math.max(1, ...d.daily_stats.map(x => x.total));
-        $('#weekChart').innerHTML = d.daily_stats.map(x => {
+        document.getElementById('weekChart').innerHTML = d.daily_stats.map(x => {
             const h = (x.total / maxVal * 140) || 4;
             return `<div class="chart-bar-wrap"><div class="chart-bar-value">${x.total}</div><div class="chart-bar" style="height:${h}px" title="${x.record_date}: ${x.total}课时"></div><div class="chart-bar-label">${(x.record_date||'').slice(5)}</div></div>`;
         }).join('');
 
-        $('#courseRanking').innerHTML = d.course_ranking.length === 0 ? '<div class="empty-state"><div class="empty-text">暂无数据</div></div>'
-            : d.course_ranking.map((c,i) => `<div style="display:flex;align-items:center;padding:8px 0;border-bottom:1px solid var(--gray-100);gap:10px;"><span style="font-weight:700;color:var(--primary);">#${i+1}</span><span style="flex:1;font-size:13px;">${c.name}</span><span class="font-bold font-mono">${c.total_hours} 课时</span></div>`).join('');
+        const ranking = d.course_ranking || [];
+        document.getElementById('courseRanking').innerHTML = ranking.length === 0 ? '<div class="empty-state"><div class="empty-text">暂无数据</div></div>'
+            : ranking.map((c,i) => {
+                const medal = i === 0 ? '🥇' : i === 1 ? '🥈' : i === 2 ? '🥉' : '#' + (i+1);
+                return `<div class="rank-item"><span style="font-size:18px;">${medal}</span><span style="flex:1;font-size:13px;">${c.name}</span><span class="font-bold font-mono">${c.total_hours} 课时</span></div>`;
+            }).join('');
 
         const today = new Date();
-        $('#todayDate').textContent = `${today.getFullYear()}-${String(today.getMonth()+1).padStart(2,'0')}-${String(today.getDate()).padStart(2,'0')}`;
-        $('#todayScheduleTable').innerHTML = d.today_schedules.length === 0 ? '<tr><td colspan="8"><div class="empty-state"><div class="empty-text">今日暂无排课</div></div></td></tr>'
+        document.getElementById('todayDate').textContent = today.getFullYear() + '-' + String(today.getMonth()+1).padStart(2,'0') + '-' + String(today.getDate()).padStart(2,'0');
+        document.getElementById('todayScheduleTable').innerHTML = d.today_schedules.length === 0 ? '<tr><td colspan="8"><div class="empty-state"><div class="empty-text">今日暂无排课</div></div></td></tr>'
             : d.today_schedules.map(s => {
                 const st = s.status==='completed'?'<span class="tag tag-success">已完成</span>':s.status==='cancelled'?'<span class="tag tag-danger">已取消</span>':'<span class="tag tag-info">待上课</span>';
                 const act = s.status==='scheduled'?`<button class="btn btn-success btn-xs" onclick="checkinSchedule(${s.id})">签到消课</button>`:'';
@@ -256,13 +319,28 @@ async function loadDashboard() {
             }).join('');
     } catch (e) {
         toast('加载失败，请检查网络连接', 'error');
-        $('#dashboardStats').innerHTML = '<div class="empty-state"><div class="empty-text" style="font-size:16px;">⚠️ 数据加载失败</div><div style="color:#9CA3AF;margin-top:8px;">请检查网络连接或稍后重试</div></div>';
-        $('#weekChart').innerHTML = '';
-        $('#courseRanking').innerHTML = '';
-        $('#todayScheduleTable').innerHTML = '<tr><td colspan="8"><div class="empty-state"><div class="empty-text">暂无排课数据</div></div></td></tr>';
+        document.getElementById('dashboardStats').innerHTML = '<div class="empty-state"><div class="empty-text" style="font-size:16px;">⚠️ 数据加载失败</div><div style="color:#9CA3AF;margin-top:8px;">请检查网络连接或稍后重试</div></div>';
+        document.getElementById('weekChart').innerHTML = '';
+        document.getElementById('courseRanking').innerHTML = '';
+        document.getElementById('todayScheduleTable').innerHTML = '<tr><td colspan="8"><div class="empty-state"><div class="empty-text">暂无排课数据</div></div></td></tr>';
     }
 }
 
+function animateStatNumbers() {
+    const els = document.querySelectorAll('.stat-value[data-count]');
+    els.forEach(el => {
+        const target = parseInt(el.dataset.count);
+        const duration = 800;
+        const start = performance.now();
+        function step(now) {
+            const progress = Math.min((now - start) / duration, 1);
+            const eased = 1 - Math.pow(1 - progress, 3);
+            el.textContent = Math.round(eased * target);
+            if (progress < 1) requestAnimationFrame(step);
+        }
+        requestAnimationFrame(step);
+    });
+}
 async function checkinSchedule(sid) {
     if (!confirm('确认签到并消课？')) return;
     const res = await api('/api/records', { method: 'POST', body: JSON.stringify({ schedule_id: sid }) });
@@ -600,6 +678,60 @@ async function loadBackup(){
     const tbody=$('#backupHistoryTable');
     if(history.length===0){tbody.innerHTML='<tr><td colspan="3"><div class="empty-state"><div class="empty-text">暂无备份记录</div></div></td></tr>';return;}
     tbody.innerHTML=history.map(h=>`<tr><td>${h.filename}</td><td>${(h.file_size/1024).toFixed(1)}KB</td><td>${h.created_at}</td></tr>`).join('');
+    // 加载云端配置
+    loadCloudConfig();
+}
+
+async function loadCloudConfig(){
+    try{
+        const r=await api('/api/config/cloud');
+        if(r.code===200&&r.data){
+            const d=r.data;
+            const st=$('#cloudConfigStatus');
+            if(d.api_key_set){
+                st.innerHTML='<span style="color:#10B981;">✅ 已配置密钥 ('+d.api_key_masked+') · 环境: '+d.env_id+'</span>';
+                // 显示脱敏值作为占位提示，标记已配置
+                $('#cloudApiKey').value='';
+                $('#cloudApiKey').placeholder='已配置 ('+d.api_key_masked+')，重新输入则覆盖';
+                $('#cloudApiKey').dataset.configured='1';
+            }else{
+                st.innerHTML='<span style="color:#EF4444;">❌ 未配置云端密钥，请填写 TCB_API_KEY</span>';
+                $('#cloudApiKey').value='';
+                $('#cloudApiKey').placeholder='粘贴 CloudBase API Key...';
+                delete $('#cloudApiKey').dataset.configured;
+            }
+            $('#cloudEnvId').value=d.env_id||'';
+        }
+    }catch(e){}
+}
+
+async function saveCloudConfig(){
+    const keyEl=$('#cloudApiKey'), envEl=$('#cloudEnvId');
+    const apiKey=keyEl.value.trim(), envId=envEl.value.trim();
+    if(!keyEl.dataset.configured&&!apiKey){toast('请输入 TCB_API_KEY','warning');return;}
+    const payload={};
+    // 只有用户重新输入了完整密钥时才发送（空值且已配置 = 不覆盖现有密钥）
+    if(apiKey){
+        payload.api_key=apiKey;
+    }
+    if(envId){payload.env_id=envId;}
+    if(!payload.api_key&&!payload.env_id){toast('未做任何更改','info');return;}
+    try{
+        const r=await api('/api/config/cloud',{method:'POST',body:JSON.stringify(payload)});
+        if(r.code===200){toast('云端配置已保存','success');loadCloudConfig();}
+        else toast(r.message,'error');
+    }catch(e){toast('保存失败','error');}
+}
+
+async function testCloudConfig(){
+    const btn=$('#btnTestCloud'),st=$('#cloudConfigStatus');
+    btn.disabled=true;btn.textContent='测试中...';
+    try{
+        const r=await api('/api/config/cloud/test',{method:'POST'});
+        if(r.code===200){st.innerHTML='<span style="color:#10B981;">✅ 云端连接成功</span>';}
+        else{st.innerHTML='<span style="color:#EF4444;">❌ '+r.message+'</span>';}
+    }catch(e){st.innerHTML='<span style="color:#EF4444;">❌ 连接异常</span>';}
+    btn.disabled=false;btn.textContent='测试连接';
 }
 
 

@@ -252,6 +252,13 @@ def init_db():
         );
         CREATE INDEX IF NOT EXISTS idx_user_permissions_user ON user_permissions(user_id);
 
+        -- 系统配置表（键值对存储）
+        CREATE TABLE IF NOT EXISTS system_config (
+            key TEXT NOT NULL PRIMARY KEY,
+            value TEXT NOT NULL DEFAULT '',
+            updated_at TIMESTAMP DEFAULT (datetime('now', 'localtime'))
+        );
+
     ''')
 
     conn.commit()

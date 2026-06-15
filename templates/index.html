@@ -7,22 +7,40 @@
     <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
     <meta http-equiv="Pragma" content="no-cache">
     <meta http-equiv="Expires" content="0">
-    <link rel="stylesheet" href="/static/css/style.css?v=4.0">
-</head>
+    <link rel="stylesheet" href="/static/css/style.css?v=4.0"></head>
 <body>
     <!-- ========== 登录页 ========== -->
-    <div id="loginOverlay" style="position:fixed;top:0;left:0;right:0;bottom:0;background:linear-gradient(135deg,#667eea,#764ba2);z-index:9999;display:flex;align-items:center;justify-content:center;">
-        <div style="background:white;border-radius:16px;padding:40px;width:400px;max-width:90%;box-shadow:0 20px 60px rgba(0,0,0,0.3);">
-            <div style="text-align:center;margin-bottom:24px;">
-                <div style="font-size:48px;margin-bottom:8px;">📚</div>
-                <h2 style="color:#4F46E5;margin:0;">课消管理系统</h2>
-                <p style="color:#9CA3AF;font-size:13px;margin:4px 0 0;">v3.0 - 登录</p>
+    <div id="loginOverlay" class="login-overlay">
+        <div class="login-card">
+            <div class="login-card-body">
+                <div class="login-card-header">
+                    <div class="login-icon">📚</div>
+                    <h2>课消管理系统</h2>
+                    <p>高效管理每一堂课 · v3.0</p>
+                </div>
+                <div class="form-group">
+                    <label>用户名</label>
+                    <input type="text" class="form-input" id="loginUsername" placeholder="输入用户名或手机号">
+                </div>
+                <div class="form-group">
+                    <label>密码</label>
+                    <div class="password-wrap">
+                        <input type="password" class="form-input" id="loginPassword" placeholder="输入密码" onkeydown="if(event.key==='Enter')doLogin()">
+                        <button class="password-toggle" type="button" onclick="togglePasswordVisibility()" id="pwdToggleBtn" aria-label="切换密码可见性">👁️</button>
+                    </div>
+                </div>
+                <div id="loginError" class="login-error"></div>
+                <div class="login-options">
+                    <label class="remember-me">
+                        <input type="checkbox" id="rememberMe"> 记住我
+                    </label>
+                </div>
+                <button class="btn btn-primary login-btn" onclick="doLogin()" id="loginBtn">
+                    <span class="spinner"></span>
+                    <span class="btn-text">登 录</span>
+                </button>
             </div>
-            <div class="form-group"><label>用户名</label><input type="text" class="form-input" id="loginUsername" placeholder="输入用户名" style="font-size:15px;padding:10px 14px;"></div>
-            <div class="form-group"><label>密码</label><input type="password" class="form-input" id="loginPassword" placeholder="输入密码" style="font-size:15px;padding:10px 14px;" onkeydown="if(event.key==='Enter')doLogin()"></div>
-            <div id="loginError" style="color:#EF4444;font-size:13px;margin-bottom:12px;display:none;"></div>
-            <button class="btn btn-primary" onclick="doLogin()" style="width:100%;padding:12px;font-size:15px;">登 录</button>
-    </div>
+        </div>
     </div>
 
     <!-- ========== 主布局（登录后显示） ========== -->
@@ -139,11 +157,32 @@
                 <!-- 备份恢复 -->
                 <div class="page" id="page-backup">
                     <div class="section">
+                        <div class="section-header"><span class="section-title">☁️ 云端配置</span></div>
+                        <div style="padding:20px;background:var(--gray-50);border-radius:8px;">
+                            <p style="font-size:13px;color:var(--gray-500);margin-bottom:16px;">配置 CloudBase 云端密钥后，即可使用「同步到云端」和「云端恢复」功能。密钥保存至本地数据库，不会上传。</p>
+                            <div style="display:flex;gap:16px;flex-wrap:wrap;align-items:flex-end;">
+                                <div style="flex:2;min-width:240px;">
+                                    <label style="font-size:12px;color:var(--gray-500);display:block;margin-bottom:4px;">TCB_API_KEY（云端密钥）</label>
+                                    <input type="password" class="form-input" id="cloudApiKey" placeholder="粘贴 CloudBase API Key...">
+                                </div>
+                                <div style="flex:1;min-width:180px;">
+                                    <label style="font-size:12px;color:var(--gray-500);display:block;margin-bottom:4px;">环境 ID（ENV ID）</label>
+                                    <input type="text" class="form-input" id="cloudEnvId" placeholder="tutoring-d1g8s1kwf3a000614">
+                                </div>
+                                <div style="display:flex;gap:8px;">
+                                    <button class="btn btn-primary btn-sm" onclick="saveCloudConfig()">保存配置</button>
+                                    <button class="btn btn-outline btn-sm" onclick="testCloudConfig()" id="btnTestCloud">测试连接</button>
+                                </div>
+                            </div>
+                            <div id="cloudConfigStatus" style="margin-top:8px;font-size:12px;"></div>
+                        </div>
+                    </div>
+                    <div class="section" style="margin-top:20px;">
                         <div class="section-header"><span class="section-title">💾 数据库备份与恢复</span></div>
                         <div style="padding:20px;display:flex;gap:20px;flex-wrap:wrap;">
                             <div style="flex:1;min-width:280px;background:var(--gray-50);border-radius:8px;padding:20px;">
-                                <h4 style="margin-bottom:12px;">☁️ 云端备份</h4>
-                                <p style="font-size:13px;color:var(--gray-500);margin-bottom:16px;">上传至CloudBase云存储（免费），容器重启后自动恢复</p>
+                                <h4 style="margin-bottom:12px;">☁️ 同步到云端</h4>
+                                <p style="font-size:13px;color:var(--gray-500);margin-bottom:16px;">将当前数据库上传至CloudBase云存储，实现跨设备数据同步</p>
                                 <button class="btn btn-info" onclick="cloudSync()" id="btnCloudSync">同步到云端</button>
                                 <span id="cloudSyncStatus" style="margin-left:8px;font-size:12px;"></span>
                             </div>
@@ -209,6 +248,7 @@
     <div class="toast-container" id="toastContainer"></div>
     <div id="modalContainer"></div>
 
+    {% if use_cloud_api %}<script>window.__API_BASE__ = 'https://tutoring-269057-7-1316430031.sh.run.tcloudbase.com';</script>{% endif %}
     <script src="/static/js/app.js?v=4.0"></script>
 </body>
 </html>
